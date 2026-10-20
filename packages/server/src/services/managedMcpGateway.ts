@@ -1,3 +1,4 @@
+import { requireExternalService } from "../config/privacyPolicy";
 import dns from "node:dns";
 import { BlockList, isIP } from "node:net";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -137,6 +138,7 @@ async function safeLookup(
 }
 
 export function createSafeFetch(): { fetch: typeof globalThis.fetch; close: () => Promise<void> } {
+  requireExternalService("Remote MCP");
   const dispatcher = new Agent({
     connect: { lookup: safeLookup as never },
     headersTimeout: MCP_TIMEOUT_MS,
@@ -144,6 +146,7 @@ export function createSafeFetch(): { fetch: typeof globalThis.fetch; close: () =
     maxResponseSize: MCP_MAX_HTTP_RESPONSE_BYTES,
   });
   const fetch = ((input: URL | RequestInfo, init?: RequestInit) => {
+    requireExternalService("Remote MCP");
     const rawUrl = input instanceof URL ? input.toString() : typeof input === "string" ? input : input.url;
     validateManagedMcpEndpoint(rawUrl);
     return undiciFetch(input as never, {
@@ -259,6 +262,7 @@ async function withClient<T>(
   authProvider?: OAuthClientProvider,
   authKind: ManagedMcpAuthKind = "none",
 ): Promise<T> {
+  requireExternalService("Remote MCP");
   const url = validateManagedMcpEndpoint(endpoint);
   const controller = new AbortController();
   const timeout = setClockTimeout(() => controller.abort(), MCP_TIMEOUT_MS);

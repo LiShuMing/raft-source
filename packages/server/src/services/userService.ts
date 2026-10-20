@@ -4,6 +4,7 @@ import { eq, and, asc, gt, isNull, sql } from "drizzle-orm";
 import argon2 from "argon2";
 import { createHash, randomBytes } from "node:crypto";
 import { getDb } from "../db/index";
+import { isStandaloneMode } from "../config/deploymentMode";
 import type { DatabaseExecutor } from "../db/index";
 import { users, emailVerifications, passwordResets, userAuthIdentities, sessionFamilies, sessions, userRetirementReceipts } from "../db/schema";
 import { sendVerificationEmail, sendPasswordResetEmail } from "./emailService";
@@ -338,7 +339,10 @@ export async function createUser(
 
   const passwordHash = await argon2.hash(password);
 
-  const token = randomBytes(32).toString("hex");
+  // Standalone identities are local to this database. Mailbox ownership is not
+  // required; keep the shared authorization gate satisfied without sending mail.
+  const localAccount = isStandaloneMode();
+  const token = localAccount ? null : randomBytes(32).toString("hex");
 
   let publicUser: PublicUser;
   try {
@@ -354,6 +358,7 @@ export async function createUser(
         name: pendingHandle ?? name!,
         displayName: options.deferProfileSetup ? null : name,
         passwordHash,
+        emailVerified: localAccount,
         passwordCredentialEstablishedAt: currentDate(),
         profileSetupCompletedAt: options.deferProfileSetup ? null : currentDate(),
         profileSetupSuggestedHandle: suggestedHandle,
@@ -363,11 +368,13 @@ export async function createUser(
       }).returning();
 
       await legalAcceptanceService.insertUserLegalAcceptance(transaction, user.id, legalSource, legalMetadata);
-      await transaction.insert(emailVerifications).values({
-        userId: user.id,
-        tokenHash: hashToken(token),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h
-      });
+      if (token) {
+        await transaction.insert(emailVerifications).values({
+          userId: user.id,
+          tokenHash: hashToken(token),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h
+        });
+      }
 
       return toPublicUser(user);
     });
@@ -378,7 +385,9 @@ export async function createUser(
     throw err;
   }
 
-  await sendVerificationEmail(normalizedEmail, options.deferProfileSetup ? "there" : name!, token);
+  if (token) {
+    await sendVerificationEmail(normalizedEmail, options.deferProfileSetup ? "there" : name!, token);
+  }
 
   if (!options.deferProfileSetup) {
     await syncNewsletterSignup(publicUser);
@@ -456,10 +465,19 @@ export async function authenticateUser(
         isNull(users.passwordCredentialEstablishedAt),
       ));
     }
+    // Recover accounts created before standalone onboarding was available.
+    // Only accept them after password proof AND locked credential revalidation.
+    // Never bulk-verify accounts or trust a client-supplied deployment mode.
+    let localUser: typeof current | undefined;
+    if (isStandaloneMode() && !current.emailVerified) {
+      [localUser] = await tx.update(users).set({ emailVerified: true, updatedAt: currentDate() })
+        .where(eq(users.id, user.id)).returning();
+      await tx.delete(emailVerifications).where(eq(emailVerifications.userId, user.id));
+    }
     const session = await createSession(user.id, tx);
     return {
       user: toPublicUser({
-        ...(linked ?? current),
+        ...(localUser ?? linked ?? current),
         profileSetupProvider: await getProfileSetupProvider(tx, user.id),
       }),
       session,

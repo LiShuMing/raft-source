@@ -17,6 +17,8 @@ import DialogCard from "../ui/DialogCard";
 import FormField from "../ui/FormField";
 import Banner from "../ui/Banner";
 import ComputerCommandGuide from "./ComputerCommandGuide";
+import LocalComputerConnect from "./LocalComputerConnect";
+import { useAuthProviders } from "../../hooks/useAuthProviders";
 
 /** A link-like action inside a banner sentence (Raft DS UI text link: ink,
  *  1.5px underline, 600). */
@@ -31,7 +33,21 @@ type DialogStep = "type" | "waiting" | "connected";
 export const WAITING_HINT_DELAY_MS = 45_000;
 type MachineType = "local" | "cloud";
 
-export default function AddMachineDialog({ onClose }: { onClose: () => void }) {
+export default function AddMachineDialog(props: { onClose: () => void }) {
+  const { standalone } = useAuthProviders();
+  const serverId = useServerStore((state) => state.current?.id);
+  const { formatMessage } = useIntl();
+  if (standalone && serverId) {
+    return (
+      <DialogCard title={formatMessage({ id: "machine.local.connect" })} onClose={props.onClose}>
+        <LocalComputerConnect key={serverId} serverId={serverId} />
+      </DialogCard>
+    );
+  }
+  return <RemoteAddMachineDialog {...props} />;
+}
+
+function RemoteAddMachineDialog({ onClose }: { onClose: () => void }) {
   const { formatMessage } = useIntl();
   const nav = useAppNavigate();
   const [step, setStep] = useState<DialogStep>("type");

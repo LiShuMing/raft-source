@@ -1,3 +1,5 @@
+import { isStandaloneMode } from "../config/deploymentMode";
+import { requireExternalService } from "../config/privacyPolicy";
 import { createHash } from "node:crypto";
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -108,6 +110,7 @@ function openAICompatibleProviderFromSsm(config: { apiKey: string; endpoint: str
 }
 
 export async function initializeTranslationProviderConfig(): Promise<void> {
+  if (isStandaloneMode()) return;
   if (!translationSsmIsConfigured()) return;
   const config = await translationSsmConfig.get();
   if (config.provider !== "openai-compatible") {
@@ -121,6 +124,7 @@ export function invalidateTranslationProviderConfigForTests(): void {
 }
 
 export async function resolveProviderFromRuntimeConfig(): Promise<ResolvedTranslationProvider> {
+  requireExternalService("Message translation");
   if (translationSsmIsConfigured()) {
     const config = await translationSsmConfig.get();
     if (config.provider !== "openai-compatible") {
@@ -310,6 +314,7 @@ export function resolveProviderFromEnv(): ResolvedTranslationProvider {
 }
 
 export function isTranslationProviderConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (isStandaloneMode(env)) return false;
   if (translationSsmIsConfigured(env)) return true;
   const configuredProvider = env.TRANSLATION_PROVIDER?.trim().toLowerCase();
   if (configuredProvider === "fake") {
@@ -704,6 +709,7 @@ export async function translateMessagesBatch(input: {
   mode: TranslationMode;
   messageIds: string[];
 }): Promise<MessageTranslationBatchResult[]> {
+  requireExternalService("Message translation");
   return translateVisibleMessagesBatch(input, await listVisibleMessages(input));
 }
 
@@ -719,6 +725,7 @@ export async function translatePublicMessagesBatch(input: {
   mode: TranslationMode;
   messageIds: string[];
 }): Promise<MessageTranslationBatchResult[]> {
+  requireExternalService("Message translation");
   const db = getDb();
   const uniqueIds = [...new Set(input.messageIds)];
   if (uniqueIds.length === 0) return [];

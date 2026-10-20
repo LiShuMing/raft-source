@@ -1,3 +1,5 @@
+import { isStandaloneDeployment } from "./deploymentMode";
+
 export const CHINESE_COMMUNITY_QR_CONFIG_URL = "https://static.raft.build/community/chinese-qr.json";
 export const CHINESE_COMMUNITY_QR_FALLBACK_CONFIG_PATH = "/community/chinese-qr.json";
 
@@ -15,6 +17,7 @@ declare global {
 }
 
 export function getChineseCommunityQrConfigUrl() {
+  if (isStandaloneDeployment()) return CHINESE_COMMUNITY_QR_FALLBACK_CONFIG_PATH;
   if (typeof window === "undefined") return CHINESE_COMMUNITY_QR_CONFIG_URL;
   return window.__RAFT_CHINESE_COMMUNITY_QR_CONFIG_URL__ || CHINESE_COMMUNITY_QR_CONFIG_URL;
 }

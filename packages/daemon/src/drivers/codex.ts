@@ -703,8 +703,11 @@ export function resolveCodexSpawn(commandArgs: string[], deps: ProbeDeps = {}): 
     restartNote });
 }
 
-export function buildCodexAppServerArgs(managedMcp?: { name: string; url: string } | null): string[] {
+export function buildCodexAppServerArgs(managedMcp?: { name: string; url: string } | null, disableTelemetry = false): string[] {
   const args = ["app-server"];
+  if (disableTelemetry) {
+    args.push("-c", "analytics.enabled=false", "-c", "feedback.enabled=false", "-c", 'otel.exporter="none"');
+  }
   if (managedMcp) {
     args.push("-c", `mcp_servers.${managedMcp.name}.url=${JSON.stringify(managedMcp.url)}`);
   }
@@ -1051,7 +1054,7 @@ export class CodexDriver implements RuntimeDriver {
       cwd: ctx.workingDirectory,
     });
 
-    const args = buildCodexAppServerArgs(managedMcp);
+    const args = buildCodexAppServerArgs(managedMcp, spawnEnv.RAFT_DEPLOYMENT_MODE === "standalone");
 
     // task #1277: candidate discovery and the app-server probes run as bounded
     // probe children under this start attempt's signal; a cancelled lookup is

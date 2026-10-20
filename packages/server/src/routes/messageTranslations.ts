@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { isStandaloneMode } from "../config/deploymentMode";
 import { normalizeTranslationLanguageCode } from "@botiverse/raft-shared";
 import { translateMessagesBatch, TranslationFeatureUnavailableError, type TranslationMode } from "../services/messageTranslationService";
 import { getServerTranslationSettings } from "../services/serverService";
@@ -12,6 +13,10 @@ function parseMode(value: unknown): TranslationMode | null {
 }
 
 export async function messageTranslationBatchHandler(req: Request, res: Response): Promise<void> {
+  if (isStandaloneMode()) {
+    res.status(503).json({ error: "Message translation is disabled by the standalone privacy policy" });
+    return;
+  }
   try {
     const targetLanguage = typeof req.body?.targetLanguage === "string"
       ? normalizeTranslationLanguageCode(req.body.targetLanguage)

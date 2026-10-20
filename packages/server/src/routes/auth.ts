@@ -87,6 +87,7 @@ import {
   verifySocialAuthState,
 } from "../services/socialAuthService";
 import type { SocialAuthMode, SocialAuthProfile, SocialAuthProvider } from "../services/socialAuthService";
+import { getDeploymentMode, isStandaloneMode } from "../config/deploymentMode";
 import { parseCanonicalBrowserTimezone, parseIanaTimezone } from "../lib/ianaTimezone";
 
 export const authRouter: RouterType = Router();
@@ -716,6 +717,11 @@ authRouter.get("/providers", async (req, res) => {
   }
   const platform: featureFlagService.FeatureFlagPlatform = platformParam;
 
+  if (isStandaloneMode()) {
+    res.json({ providers: [], deploymentMode: "standalone" });
+    return;
+  }
+
   const providerConfigs = ["google", "github", "apple"]
     .map((providerId) => getSocialAuthProvider(providerId))
     .filter((provider): provider is NonNullable<typeof provider> => !!provider);
@@ -726,7 +732,7 @@ authRouter.get("/providers", async (req, res) => {
       enabled: await isSocialAuthProviderAvailable(provider, platform),
     })));
 
-  res.json({ providers });
+  res.json({ providers, deploymentMode: getDeploymentMode() });
 });
 
 authRouter.get("/identities", requireAuth, async (req, res) => {

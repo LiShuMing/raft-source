@@ -1,3 +1,4 @@
+import { isStandaloneMode } from "../config/deploymentMode";
 import http2 from "node:http2";
 import { lookup as dnsLookup } from "node:dns/promises";
 import { Agent as HttpsAgent } from "node:https";
@@ -594,7 +595,7 @@ export function __resetMobilePushDeliveryRuntimeForTests() {
 }
 
 export function isPushEnabled(): boolean {
-  return webPushRuntime.enabled;
+  return !isStandaloneMode() && webPushRuntime.enabled;
 }
 
 export function getVapidPublicKey(): string {
@@ -991,6 +992,7 @@ export async function dispatchMobilePushForInboxFacts(
   executor: DatabaseExecutor = getDb(),
   options: { badgeByReceiverId?: ReadonlyMap<string, number | undefined> } = {},
 ): Promise<MobilePushDispatchSummary> {
+  if (isStandaloneMode()) return { attempted: 0, sent: 0, skipped: facts.length, revoked: 0, dropped: 0 };
   const unreadEligibleFacts = facts.filter((fact) =>
     fact.receiverType === "user"
       && fact.unreadEligible !== false
@@ -1365,6 +1367,7 @@ export async function drainMobilePushOutbox(
   batchSize = MOBILE_PUSH_OUTBOX_BATCH_SIZE,
   executor: DatabaseExecutor = getDb(),
 ): Promise<{ claimed: number; processed: number }> {
+  if (isStandaloneMode()) return { claimed: 0, processed: 0 };
   const staleLockedAt = new Date(currentTimeMs() - MOBILE_PUSH_OUTBOX_LOCK_TIMEOUT_MS);
   const candidates = await mobilePushOutboxDrainCandidatesQuery(executor, staleLockedAt, batchSize);
 
@@ -1638,6 +1641,7 @@ export function startMobilePushOutboxWorker(opts: {
 }
 
 export async function sendPushToUsers(userIds: string[], payload: PushPayload) {
+  if (isStandaloneMode()) return { attempted: 0, delivered: 0, failed: 0 };
   if (!webPushRuntime.enabled || userIds.length === 0) {
     return { attempted: 0, delivered: 0, failed: 0 };
   }
@@ -1700,6 +1704,7 @@ export async function sendPushToUsers(userIds: string[], payload: PushPayload) {
 }
 
 export async function sendPushNotifications(targets: Array<{ userId: string; payload: PushPayload }>) {
+  if (isStandaloneMode()) return;
   if (!webPushRuntime.enabled || targets.length === 0) return;
 
   // Users who are on Raft Desktop right now get the message there; a browser

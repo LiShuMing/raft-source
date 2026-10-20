@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { User } from "lucide-react";
 import { isRaftUploadedHumanAvatarUrl } from "../../utils/humanAvatar";
+import { isStandaloneDeployment } from "../../utils/deploymentMode";
 
 interface GravatarAvatarProps {
   /** Uploaded avatar URL. Takes priority over Gravatar. */
@@ -46,7 +47,9 @@ export default function GravatarAvatar({ avatarUrl, gravatarHash, email, size = 
   const [gravatarLoaded, setGravatarLoaded] = useState(() =>
     initialHash ? loadedGravatarHashes.has(initialHash) : false,
   );
-  const uploadedAvatarUrl = isRaftUploadedHumanAvatarUrl(avatarUrl) ? avatarUrl : null;
+  const uploadedAvatarUrl = isRaftUploadedHumanAvatarUrl(avatarUrl)
+    && (!isStandaloneDeployment() || new URL(avatarUrl, window.location.href).origin === window.location.origin)
+    ? avatarUrl : null;
 
   // Re-resolve gravatar hash when `email`/`gravatarHash` prop changes — a
   // different person (different prop) needs a different gravatar; this is
@@ -69,6 +72,10 @@ export default function GravatarAvatar({ avatarUrl, gravatarHash, email, size = 
 
     // oxlint-disable-next-line react-doctor/no-adjust-state-on-prop-change
     setUploadedFailed(false);
+    if (isStandaloneDeployment()) {
+      applyHash(null);
+      return;
+    }
     if (gravatarHash) {
       applyHash(gravatarHash);
       return;
@@ -95,7 +102,7 @@ export default function GravatarAvatar({ avatarUrl, gravatarHash, email, size = 
     );
   }
 
-  if (!hash || failed) {
+  if (isStandaloneDeployment() || !hash || failed) {
     return <User size={iconSize} />;
   }
 

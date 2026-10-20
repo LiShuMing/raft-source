@@ -1,17 +1,7 @@
-/**
- * Test seam for the RisingWave-served Activity reads: the Activity item list
- * (getInboxItems), the Activity unread totals (getActivityUnreadTotalsBatch),
- * the followed-thread stats and the followed-threads rows (getFollowedThreads).
- *
- * RisingWave is a hard dependency: production reads these from RisingWave only,
- * and with no RisingWave configured (or a failed read) the request fails. There
- * is no Postgres fallback in the product.
- *
- * CI unit tests and e2e run on PGlite without RisingWave, so they explicitly
- * install a Postgres reference (src/test/risingWaveReadReference.ts) through
- * this seam. Like conversationUnreadSource.ts, this module is deliberately tiny
- * (type-only imports) so the test setup can install the reference without
- * loading channelService. Production never sets the override.
+import { isStandaloneMode } from "../config/deploymentMode";
+/** Read source selection: standard uses RisingWave; standalone uses canonical
+ * PostgreSQL. Tests may inject a source without changing the deployment profile.
+ * Selection is explicit, never an error-triggered fallback.
  */
 import type { DbQueryTracer } from "../tracing/dbQueryTrace";
 import type {
@@ -55,6 +45,25 @@ export type ActivityReadSource = {
   followedThreadRows(query: FollowedThreadRowsQuery): Promise<FollowedThreadRwRow[]>;
 };
 
+const standaloneSource: ActivityReadSource = {
+  async inboxItems(...args) {
+    const { postgresActivityReadSource } = await import("./postgresActivityReadSource");
+    return postgresActivityReadSource.inboxItems(...args);
+  },
+  async activityUnreadTotals(...args) {
+    const { postgresActivityReadSource } = await import("./postgresActivityReadSource");
+    return postgresActivityReadSource.activityUnreadTotals(...args);
+  },
+  async followedThreadStats(query) {
+    const { postgresActivityReadSource } = await import("./postgresActivityReadSource");
+    return postgresActivityReadSource.followedThreadStats(query);
+  },
+  async followedThreadRows(query) {
+    const { postgresActivityReadSource } = await import("./postgresActivityReadSource");
+    return postgresActivityReadSource.followedThreadRows(query);
+  },
+};
+
 let testSource: ActivityReadSource | null = null;
 
 /** TEST-ONLY: replace the RisingWave Activity reads with another source (null restores RisingWave). */
@@ -62,6 +71,9 @@ export function __setActivityReadSourceForTests(source: ActivityReadSource | nul
   testSource = source;
 }
 
-export function getActivityReadSourceOverride(): ActivityReadSource | null {
-  return testSource;
+export function getActivityReadSource(): ActivityReadSource | null {
+  return testSource ?? (isStandaloneMode() ? standaloneSource : null);
 }
+
+/** Compatibility name for tests that snapshot the installed source. */
+export const getActivityReadSourceOverride = getActivityReadSource;

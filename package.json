@@ -17,7 +17,10 @@
     "typecheck:raftdev": "tsc -p tsconfig.raftdev.json",
     "test:web": "node packages/web/scripts/run-vitest-tests.mjs",
     "test:web:dom": "node packages/web/scripts/run-vitest-tests.mjs --dom",
-    "test:ax-book": "vitest run scripts/visualize/ax-surfaces/book.test.mjs"
+    "test:ax-book": "vitest run scripts/visualize/ax-surfaces/book.test.mjs",
+    "standalone:build": "pnpm --filter @botiverse/raft-daemon build && pnpm --filter @botiverse/raft-web build",
+    "standalone": "pnpm --filter @botiverse/raft-server standalone",
+    "standalone:test": "pnpm --filter @botiverse/raft-server test -- src/standalone/ --maxWorkers=1 --testTimeout=30000 --hookTimeout=30000"
   },
   "devDependencies": {
     "@oxc-node/core": "^0.1.6",

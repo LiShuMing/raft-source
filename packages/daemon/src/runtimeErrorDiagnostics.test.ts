@@ -42,6 +42,7 @@ test("buildRuntimeErrorDiagnosticEnvelope reserves 403 user reauth for explicit 
   for (const message of [
     "API Error: 403 Forbidden: invalid api key",
     "API Error: 403 Authentication failed: please log in",
+    "Failed to authenticate. API Error: 403 Forbidden",
   ]) {
     const envelope = buildRuntimeErrorDiagnosticEnvelope(message);
     assert.equal(envelope.spanAttrs.runtime_error_class, "AuthError");
@@ -50,6 +51,16 @@ test("buildRuntimeErrorDiagnosticEnvelope reserves 403 user reauth for explicit 
     assert.equal(envelope.spanAttrs.runtime_error_action, "user_reauth");
     assert.equal(envelope.spanAttrs.runtime_error_action_required, true);
   }
+});
+
+test("gateway model authorization failure requires changing model access instead of retrying or logging in", () => {
+  const message = 'Failed to authenticate. API Error: 403 data: {"error":{"message":"该模型需要授权,model:claude-opus-4-8","type":"invalid_request_error"},"type":"error"}\n\ndata: [DONE]';
+  const envelope = buildRuntimeErrorDiagnosticEnvelope(message);
+  assert.equal(envelope.spanAttrs.runtime_error_class, "ModelConfigError");
+  assert.equal(envelope.spanAttrs.runtime_error_http_status, 403);
+  assert.equal(envelope.spanAttrs.runtime_error_action, "user_model_access");
+  assert.equal(envelope.spanAttrs.runtime_error_action_required, true);
+  assert.equal(buildRuntimeErrorActivityDiagnostic(message).requiredAction, "user_model_access");
 });
 
 test("buildRuntimeErrorDiagnosticEnvelope redacts secrets and truncates long messages", () => {

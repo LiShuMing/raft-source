@@ -1,3 +1,6 @@
+import { isStandaloneMode } from "./config/deploymentMode";
+import { mountStandaloneWeb } from "./standalone/web";
+import { getPrivacyPolicy, STANDALONE_WEB_CSP } from "./config/privacyPolicy";
 import express, { type Express, type Request, type RequestHandler } from "express";
 import helmet from "helmet";
 import cors from "cors";
@@ -135,6 +138,7 @@ export function shouldSkipAuthRateLimit(input: {
 }
 
 export type CreateAppOptions = Readonly<{
+  standaloneWebDist?: string;
   testHarness?: {
     skipAuthRateLimit?: boolean;
     enforceMessageRateLimit?: boolean;
@@ -175,12 +179,9 @@ export function createApp(options: CreateAppOptions = {}): Express {
   if (options.attachmentUploadSessionService) {
     app.set("attachmentUploadSessionService", options.attachmentUploadSessionService);
   }
-  // The e2e / unit harness runs the API against pglite (prod never does), which
-  // is a more robust test signal than NODE_ENV: `ensureTestEnv` only sets
-  // NODE_ENV=test when it's unset, so an environment that pre-sets
-  // NODE_ENV=production (e.g. an agent VM) would silently miss a NODE_ENV-gated
-  // branch. Gate test-only rate-limit handling on the pglite DB URL instead.
-  const isTestEnv = process.env.DATABASE_URL?.startsWith("pglite") ?? false;
+  // Persistent standalone PGlite keeps the normal authorization and rate limits.
+  // Only the existing integration harness uses the database-based test shortcut.
+  const isTestEnv = !isStandaloneMode() && (process.env.DATABASE_URL?.startsWith("pglite") ?? false);
   // `raftdev` sets this path for its isolated local runtime. Product feedback
   // there is disposable preview data, so repeated UI review must not inherit a
   // one-hour production submission bucket. Deployed servers never set it.
@@ -188,7 +189,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
   const rateLimitValidate = isTestEnv ? false : undefined;
   const slackBridgeHandlers = createSlackBridgeRouteHandlers(options.slackBridge);
 
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV === "production" && !isStandaloneMode()) {
     app.set("trust proxy", 1);
   }
 
@@ -209,9 +210,18 @@ export function createApp(options: CreateAppOptions = {}): Express {
       directives: {
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
         "img-src": imgSrc,
+        ...(isStandaloneMode() ? STANDALONE_WEB_CSP : {}),
       },
     },
   }));
+
+  app.get("/api/privacy-policy", (_req, res) => { res.json(getPrivacyPolicy()); });
+  app.use([
+    "/api/product-feedback", "/internal/trace-ingest", "/api/mcp", "/api/push",
+  ], (_req, res, next) => {
+    if (!isStandaloneMode()) return next();
+    res.status(503).json({ code: "standalone_external_service_disabled", error: "This external service is disabled by the standalone privacy policy" });
+  });
 
   const corsOrigin = getWebCorsOriginOption();
   // The web app calls the API cross-origin with an Authorization header, so
@@ -855,6 +865,8 @@ export function createApp(options: CreateAppOptions = {}): Express {
       res.status(503).json({ status: "error", detail: "database unreachable" });
     }
   });
+
+  if (options.standaloneWebDist) mountStandaloneWeb(app, options.standaloneWebDist);
 
   app.use((req, res) => {
     res.status(404).json({

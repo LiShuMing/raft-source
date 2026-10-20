@@ -1,3 +1,7 @@
+import { LocalComputerManager } from "./standalone/localComputer";
+import { createLocalReplicaStateStore } from "./standalone/localReplicaStateStore";
+import { standalonePaths } from "./standalone/config";
+import { isStandaloneMode } from "./config/deploymentMode";
 import { startRaftbenchWorker } from "./raftbench/worker";
 import { getChannelConversionAudienceCutover, applyChannelConversionAudienceRealtimeCutover } from "./services/channelConversionService";
 import { startChannelConversionWorker } from "./services/channelConversionWorker";
@@ -81,6 +85,7 @@ import { isRisingWaveConfigured } from "./db/risingwave";
 import { warmContractSchemas } from "@botiverse/raft-shared";
 
 
+const STANDALONE = isStandaloneMode();
 const PORT = Number(process.env.PORT) || 3001;
 const DATABASE_URL = process.env.DATABASE_URL;
 const DATABASE_URL_READ_REPLICA = process.env.DATABASE_URL_READ_REPLICA;
@@ -100,7 +105,7 @@ if (!process.env.JWT_SECRET) {
 // RisingWave is a hard dependency: Activity, followed-thread stats and sidebar
 // unread are served from it only, with no Postgres fallback. A production server
 // without it would fail those reads on every request, so refuse to start.
-if (process.env.NODE_ENV === "production" && !isRisingWaveConfigured()) {
+if (!STANDALONE && process.env.NODE_ENV === "production" && !isRisingWaveConfigured()) {
   console.error("RISINGWAVE_DATABASE_URL environment variable is required in production (RisingWave is a hard dependency)");
   process.exit(1);
 }
@@ -209,6 +214,7 @@ async function bootstrap() {
   const app = createApp({
     attachmentUploadSessionService: attachmentUploadSessionService ?? undefined,
     slackBridge,
+    standaloneWebDist: STANDALONE ? process.env.RAFT_STANDALONE_WEB_DIST : undefined,
   });
   app.set("slackBridgePrivacyRevalidator", slackBridge?.revalidateChannelPrivacy);
 
@@ -228,8 +234,14 @@ async function bootstrap() {
   app.set("serverTracer", serverTracer.tracer);
 
   // Setup Agent Orchestrator
-  const agentOrchestrator = new AgentOrchestrator(undefined, undefined, serverTracer.tracer);
+  const agentOrchestrator = new AgentOrchestrator(STANDALONE ? createLocalReplicaStateStore() : undefined, undefined, serverTracer.tracer);
   app.set("agentOrchestrator", agentOrchestrator);
+  const localComputerManager = STANDALONE ? new LocalComputerManager({
+    stateDir: standalonePaths().stateDir,
+    origin: standalonePaths().origin,
+    machineStatus: (machineId) => agentOrchestrator.getMachineStatus(machineId),
+  }) : null;
+  if (localComputerManager) app.set("localComputerManager", localComputerManager);
 
   // Initialize cross-replica routing (Redis pub/sub) if Redis is available
   const { initReplicaRouter } = await import("./replicaRouter");
@@ -291,15 +303,15 @@ async function bootstrap() {
   // not cover.
   startOnboardingBriefingOnActivation({ io, orchestrator: agentOrchestrator });
   // Hosted Cindy is briefed when her workspace import lands, not on machine:online.
-  registerHostedCindyTriggers({ io, orchestrator: agentOrchestrator, trigger: triggerOwnerOnboardingOnAgentActivation, tracer: serverTracer.tracer });
+  if (!STANDALONE) registerHostedCindyTriggers({ io, orchestrator: agentOrchestrator, trigger: triggerOwnerOnboardingOnAgentActivation, tracer: serverTracer.tracer });
   // A hosted Cindy has no computer to fire her Day-2 recap; the server does.
-  const hostedCindyRecapWorker = startHostedCindyRecapWorker({ io, orchestrator: agentOrchestrator, tracer: serverTracer.tracer });
+  const hostedCindyRecapWorker = STANDALONE ? { stop: () => {} } : startHostedCindyRecapWorker({ io, orchestrator: agentOrchestrator, tracer: serverTracer.tracer });
   // Yesterday's hosted spend, per agent and for the onboarding budget, as trace events for the daily report.
-  const hostedRuntimeDailySpendWorker = startHostedRuntimeDailySpendWorker({ tracer: serverTracer.tracer });
+  const hostedRuntimeDailySpendWorker = STANDALONE ? { stop: () => {} } : startHostedRuntimeDailySpendWorker({ tracer: serverTracer.tracer });
   // New-server onboarding funnel (T3): aggregates to otel.logs every 6 hours, plus the one
   // milestone no table kept, a Computer's first connection.
   startMachineFirstConnectRecorder({ orchestrator: agentOrchestrator });
-  const onboardingFunnelWorker = startOnboardingFunnelWorker({ tracer: serverTracer.tracer });
+  const onboardingFunnelWorker = STANDALONE ? { stop: () => {} } : startOnboardingFunnelWorker({ tracer: serverTracer.tracer });
 
   // Hourly maintenance — downgrade enforcement + webhook event cleanup
   const MAINTENANCE_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
@@ -373,7 +385,7 @@ async function bootstrap() {
   const readMutationWorker = startReadMutationWorker({ tracer: serverTracer.tracer });
   const appNotificationDeliveryWorker = startAppNotificationDeliveryWorker({ tracer: serverTracer.tracer });
   const agentInboxPushWorker = startAgentInboxPushWorker({ agentOrchestrator, tracer: serverTracer.tracer });
-  const raftbenchWorker = startRaftbenchWorker(agentOrchestrator);
+  const raftbenchWorker = STANDALONE ? { stop: () => {} } : startRaftbenchWorker(agentOrchestrator);
   const assistantDoorbellWorker = startAssistantDoorbellWorker({ agentOrchestrator });
   const computerOutageNotificationWorker = startComputerOutageNotificationWorker();
   const agentMigrationReceiptOutboxWorker = startAgentMigrationReceiptOutboxWorker({
@@ -384,7 +396,7 @@ async function bootstrap() {
     io,
     orchestrator: agentOrchestrator,
   });
-  const hostedAgentMigrationImporterWorker = startHostedAgentMigrationImporterWorker({ io, orchestrator: agentOrchestrator });
+  const hostedAgentMigrationImporterWorker = STANDALONE ? { stop: () => {} } : startHostedAgentMigrationImporterWorker({ io, orchestrator: agentOrchestrator });
   // RFC 073: recover durable tasks whose inline run was lost. Off unless DURABLE_TASKS_ENABLED=true.
   const durableTaskRecovery = startDurableTaskRecovery({ registry: durableTaskRegistry, tracer: serverTracer.tracer });
   const conversionWorker = startChannelConversionWorker(async job => {
@@ -393,10 +405,10 @@ async function bootstrap() {
     else await emitChannelConversionState(io, job.sourceChannelId);
   }, sourceChannelId => emitChannelConversionState(io, sourceChannelId), slackBridge?.revalidateChannelPrivacy, serverTracer.tracer);
   const channelMembershipRoleOutboxWorker = startChannelMembershipRoleOutboxWorker({ io, tracer: serverTracer.tracer });
-  const agentRuntimeProvisionWorker = startAgentRuntimeProvisionWorker({ tracer: serverTracer.tracer });
+  const agentRuntimeProvisionWorker = STANDALONE ? { stop: () => {} } : startAgentRuntimeProvisionWorker({ tracer: serverTracer.tracer });
 
   // Start Prometheus metrics endpoint
-  startMetricsServer();
+  if (!STANDALONE) startMetricsServer();
 
   // Open a few primary PG connections before the load balancer can route
   // here, so a deploy's reconnect storm does not find an empty pool. Bounded
@@ -405,8 +417,11 @@ async function bootstrap() {
 
   // Start server
   trackHttpServer(server);
-  server.listen(PORT, () => {
+  server.listen(PORT, STANDALONE ? "127.0.0.1" : "0.0.0.0", () => {
     slackBridge?.start();
+    void localComputerManager?.resume().catch(() => {
+      console.warn("[Raft standalone] Could not resume local Computers");
+    });
     console.log(`[Slock] Server listening on http://localhost:${PORT}`);
     serverTracer.tracer.emitEvent("slock.server.started", { surface: "server" });
     startEventLoopDelaySampler(serverTracer.tracer);
@@ -553,7 +568,7 @@ async function bootstrap() {
           resolve();
         });
       }),
-      settleWorkers: () => provisionWorkerStopped,
+      settleWorkers: () => Promise.all([provisionWorkerStopped, localComputerManager?.stop()]).then(() => undefined),
       releaseMachineOwnership: async () => {
         const [orchestratorResult, slackBridgeResult] = await Promise.allSettled([
           agentOrchestrator.shutdown(),

@@ -7,6 +7,8 @@ import { RefreshCw, LogOut, KeyRound } from "lucide-react";
 import Banner from "../ui/Banner";
 import CenteredCardFrame from "./CenteredCardFrame";
 import { AuthPageIntro } from "./AuthPageFrame";
+import { useAuthProviders } from "../../hooks/useAuthProviders";
+import LoginPage from "./LoginPage";
 
 interface EmailVerificationPageProps {
   initialToken?: string | null;
@@ -16,7 +18,19 @@ function reloadPage() {
   window.location.reload();
 }
 
-export default function EmailVerificationPage({ initialToken }: EmailVerificationPageProps) {
+export default function EmailVerificationPage(props: EmailVerificationPageProps) {
+  const { standalone, loading } = useAuthProviders();
+  const { formatMessage } = useIntl();
+  // Wait for server capabilities before consuming a one-time email token. Old
+  // standalone accounts recover through password sign-in instead of email.
+  if (loading) {
+    return <CenteredCardFrame><p role="status">{formatMessage({ id: "auth.local.loading" })}</p></CenteredCardFrame>;
+  }
+  if (standalone) return <LoginPage />;
+  return <EmailVerificationForm {...props} />;
+}
+
+function EmailVerificationForm({ initialToken }: EmailVerificationPageProps) {
   const { formatMessage } = useIntl();
   const verifyEmail = useAuthStore((s) => s.verifyEmail);
   const resendVerification = useAuthStore((s) => s.resendVerification);

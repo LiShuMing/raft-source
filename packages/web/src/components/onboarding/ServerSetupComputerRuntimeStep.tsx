@@ -13,6 +13,7 @@ import { Badge, Button, Card, CardDescription, CardHeader, CardTitle, DialogSurf
 import TextLink from "../ui/TextLink";
 import Tooltip from "../ui/Tooltip";
 import SetupSessionFooter from "./SetupSessionFooter";
+import { useAuthProviders } from "../../hooks/useAuthProviders";
 
 const RECOMMENDED_RUNTIME_IDS = ["claude", "codex"] as const;
 const RUNTIME_INSTALL_COMMANDS: Record<string, string> = {
@@ -94,6 +95,7 @@ export type ServerSetupRuntimeCatalogEntry = RuntimeInfo & {
 };
 
 export type ServerSetupComputerRuntimeStepProps = {
+  serverId?: string;
   computer: ServerSetupComputer | null;
   computerInstallCommand?: string;
   /** mac/Linux one-paste install + setup; see `ComputerCommands.installAndSetup`. */
@@ -188,6 +190,7 @@ function getDetectedRuntimeNames(runtimeOptions: readonly RuntimeSelectionOption
 const NO_OFFLINE_COMPUTERS: NonNullable<ServerSetupComputerRuntimeStepProps["offlineComputers"]> = [];
 
 export default function ServerSetupComputerRuntimeStep({
+  serverId,
   computer,
   runtimeStatus,
   runtimeOptions = [],
@@ -209,6 +212,7 @@ export default function ServerSetupComputerRuntimeStep({
   onNext,
 }: ServerSetupComputerRuntimeStepProps) {
   const { formatMessage } = useIntl();
+  const { standalone } = useAuthProviders();
   // The connect step is no longer collapsible, so only the motion phase is read
   // from here; `computerExpanded` still drives the reducer's phase transitions.
   const [{ phase: connectionMotionPhase }, dispatchConnectionMotion] = useReducer(connectionMotionReducer, {
@@ -252,7 +256,7 @@ export default function ServerSetupComputerRuntimeStep({
   // "the binary is already on the machine — so this replaces the old install+setup surface")
   // and onboarding simply never used the answer. Two screens, one fact, two attitudes: the
   // computer page recognised the user, this one asked who they were.
-  const recovering = !computerOnline && hasConnectedComputer;
+  const recovering = !standalone && !computerOnline && hasConnectedComputer;
   const recoveringMany = recovering && offlineComputers.length > 1;
   // The computer has actually answered the runtime question (whatever the answer was),
   // as opposed to being online but not having reported yet.
@@ -352,6 +356,7 @@ export default function ServerSetupComputerRuntimeStep({
           {recovering ? null : (
             <>
               <ComputerCommandGuide
+                localServerId={standalone ? serverId : undefined}
                 computerCommand={setupCommand}
                 computerInstallCommand={computerInstallCommand}
                 computerInstallAndSetupCommand={computerInstallAndSetupCommand}
@@ -361,7 +366,7 @@ export default function ServerSetupComputerRuntimeStep({
               />
               {/* Instructions are for someone who has not run it yet; once the computer is
                   online they are just history. The log takes over. */}
-              {computerOnline ? null : <ConnectComputerInstructions platform={platform} />}
+              {computerOnline || standalone ? null : <ConnectComputerInstructions platform={platform} />}
             </>
           )}
           {recovering ? null : (

@@ -38,7 +38,7 @@ export interface AccountLinkSignIn {
 interface LoginPageProps {
   accountLink?: AccountLinkSignIn;
   onSwitchToRegister?: () => void;
-  onForgotPassword: () => void;
+  onForgotPassword?: () => void;
 }
 
 export default function LoginPage(props: LoginPageProps) {
@@ -51,8 +51,9 @@ function LoginPageForm({ onSwitchToRegister, onForgotPassword, accountLink }: Lo
   const { formatMessage } = useIntl();
   const login = useAuthStore((s) => s.login);
   const loading = useAuthStore((s) => s.loading);
-  const { enabledProviders } = useAuthProviders();
-  const [email, setEmail] = useState(accountLink?.email ?? "");
+  const { enabledProviders, standalone } = useAuthProviders();
+  const currentUser = useAuthStore((s) => s.user);
+  const [email, setEmail] = useState(accountLink?.email ?? currentUser?.email ?? "");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
@@ -102,6 +103,11 @@ function LoginPageForm({ onSwitchToRegister, onForgotPassword, accountLink }: Lo
     try {
       if (accountLink) await accountLink.signIn(email, password);
       else await login(email, password);
+      if (standalone) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("verify");
+        window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+      }
     } catch (err: any) {
       setError(authServerErrorMessage(err, formatMessage({ id: "pages.login.failed" }), formatMessage));
     }
@@ -119,7 +125,10 @@ function LoginPageForm({ onSwitchToRegister, onForgotPassword, accountLink }: Lo
   return (
     <AuthPageFrame>
       <div className="w-full">
-        <AuthPageIntro title={formatMessage({ id: accountLink ? "auth.accountLink.title" : "pages.login.title" })} />
+        <AuthPageIntro
+          title={formatMessage({ id: standalone ? "auth.local.signInTitle" : accountLink ? "auth.accountLink.title" : "pages.login.title" })}
+          description={standalone ? formatMessage({ id: "auth.local.signInDescription" }) : undefined}
+        />
 
         {accountLink && !accountLink.terminal && (
           <Banner intent="warning" className="mb-4">
@@ -147,11 +156,11 @@ function LoginPageForm({ onSwitchToRegister, onForgotPassword, accountLink }: Lo
           </FormField>
           <FormField
             label={formatMessage({ id: "pages.login.passwordLabel" })}
-            labelAction={(
+            labelAction={!standalone && onForgotPassword ? (
               <TextLink variant="muted" className="text-footnote" onClick={onForgotPassword}>
                 {formatMessage({ id: "pages.login.forgotPassword" })}
               </TextLink>
-            )}
+            ) : undefined}
             error={fieldErrors.password}
             htmlFor="login-password"
           >

@@ -699,6 +699,21 @@ function syntheticApiErrorAssistant(error: string, text: string, extraContent: u
   });
 }
 
+test("reports the native Claude gateway authentication error and suppresses its duplicate result", () => {
+  const fresh = new ClaudeEventNormalizer();
+  const message = 'Failed to authenticate. API Error: 403 data: {"error":{"message":"该模型需要授权,model:claude-opus-4-8","type":"invalid_request_error"}}';
+  assert.deepEqual(fresh.normalizeLine(syntheticApiErrorAssistant("authentication_failed", message)), [
+    { kind: "error", message, nativeReasonPresent: true, reasonProvenance: "runtime_error_event" },
+  ]);
+  assert.deepEqual(fresh.normalizeLine(JSON.stringify({
+    type: "result",
+    subtype: "success",
+    is_error: true,
+    result: message,
+    session_id: "session-379",
+  })), [{ kind: "turn_end", sessionId: "session-379" }]);
+});
+
 test("task #379: an assistant message with the SDK error field is an error, not model text", () => {
   const fresh = new ClaudeEventNormalizer();
   assert.deepEqual(fresh.normalizeLine(syntheticApiErrorAssistant("rate_limit", QUOTA_TEXT)), [

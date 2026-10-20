@@ -356,3 +356,11 @@ test("the retired standalone daemon connect command is not exported", async () =
   const commands = await import("../src/utils/computerSetupCommand");
   assert.equal("getDaemonConnectCommand" in commands, false);
 });
+
+
+test("self-hosted setup commands keep the supplied origin without a hosted deployment label", () => {
+  const commands = getComputerCommands("local-workspace", undefined, "http://localhost:65124");
+  assert.ok(commands);
+  assert.ok(commands.setup.includes("--server-url http://localhost:65124"));
+  assert.ok(commands.installAndSetup?.includes("--server-url http://localhost:65124"));
+});

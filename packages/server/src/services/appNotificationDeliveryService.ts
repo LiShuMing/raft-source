@@ -1,3 +1,5 @@
+import { isStandaloneMode } from "../config/deploymentMode";
+import { requireExternalService } from "../config/privacyPolicy";
 import { createHmac, randomUUID } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import { request as httpsRequest } from "node:https";
@@ -454,6 +456,7 @@ async function renderEventSubject(
  * redirects, TLS verified. Shared by app webhooks and the agent inbox push.
  */
 export async function postPublicHttps(input: Parameters<WebhookPost>[0]): Promise<WebhookPostResponse> {
+  requireExternalService("App webhooks");
   const url = new URL(input.endpointUrl);
   const hostname = url.hostname.replace(/^\[|\]$/g, "");
   const startedAt = performance.now();
@@ -566,6 +569,7 @@ export async function drainAppNotificationDeliveries(input: {
   post?: WebhookPost;
   now?: Date;
 } = {}): Promise<{ claimed: number; delivered: number; retried: number; suppressed: number; deadLettered: number }> {
+  if (isStandaloneMode()) return { claimed: 0, delivered: 0, retried: 0, suppressed: 0, deadLettered: 0 };
   const executor = input.executor ?? getDb();
   const now = input.now ?? currentDate();
   const staleLockedAt = new Date(now.getTime() - DELIVERY_LOCK_TIMEOUT_MS);

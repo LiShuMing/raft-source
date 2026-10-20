@@ -42,3 +42,6 @@ scripts/app-name-ratchet-baseline.txt.mutating
 
 # vitest coverage reports (e.g. packages/sync-core test:coverage)
 coverage/
+
+# Single-machine state when explicitly placed inside this checkout.
+/.raft-standalone/

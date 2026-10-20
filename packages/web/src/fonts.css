@@ -1,0 +1,6 @@
+/* No font CDN: opening a workspace uses only fonts installed on the device. */
+:where(:root) {
+  --heading-font: system-ui, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --sans-font: system-ui, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --mono-font: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}

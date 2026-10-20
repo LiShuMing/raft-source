@@ -1,3 +1,4 @@
+import { isStandaloneMode } from "../config/deploymentMode";
 import type { Request, Response } from "express";
 
 const DEFAULT_MAX_BYTES = 10 * 1024 * 1024;
@@ -11,6 +12,10 @@ export interface OtlpRelayConfig {
 }
 
 export async function otlpRelayHandler(req: Request, res: Response, config: OtlpRelayConfig = {}): Promise<void> {
+  if (isStandaloneMode()) {
+    res.status(503).json({ error: "Trace forwarding is disabled by the standalone privacy policy" });
+    return;
+  }
   const expectedAuthorization = config.authorization ?? process.env.OTLP_RELAY_AUTHORIZATION;
   if (!expectedAuthorization) {
     res.status(500).json({ error: "OTLP relay authorization is not configured" });

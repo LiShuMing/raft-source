@@ -1,3 +1,4 @@
+import { isStandaloneMode } from "../config/deploymentMode";
 import { revokeSocketAccess } from "../socket/accessRevocation";
 import { createHash, randomInt, randomUUID } from "crypto";
 import { performance } from "node:perf_hooks";
@@ -24,12 +25,12 @@ import {
 } from "../db/risingwave";
 import { isPoolAcquireTimeoutError, observeStatement, recordStatementError } from "../db/statementMetrics";
 import {
-  getConversationUnreadSourceOverride,
+  getConversationUnreadSource,
   type ConversationUnreadRow,
   type ConversationUnreadSummaryQuery,
   type SidebarUnreadTotalsQuery,
 } from "./conversationUnreadSource";
-import { getActivityReadSourceOverride } from "./activityReadSource";
+import { getActivityReadSource } from "./activityReadSource";
 import { agentMigrationReceiptChannels, agentPrivateSurfaces, channels, channelAgents, channelHumans, dmChannelIdentities, agents, users, serverMembers, messages, userChannelReadCursors, userChannelInboxStates, userChannelDisplayPrefs, inboxTargetMuteStates, inboxSuppressionStates, agentChannelReadCursors, servers, threadFollows, agentActivityEvents, tasks, taskEvents, jointChannels, jointChannelServers, jointChannelInvites, readMutationAuthorities, channelMembershipRoleEvents, serverAgentMembers, externalMessageAuthorFacts, externalProjectionAvatarArtifacts, externalActorProjections, externalAddressabilityProjections, externalAppInstalls, externalAppRegistrations, externalChannelBindings } from "../db/schema";
 import { gt, gte, lt } from "drizzle-orm";
 import { acquireServerLock, assertGuestJoinableChannelCapacityAvailable, GUEST_JOINABLE_CHANNEL_LOCK_NAMESPACE, GuestJoinableChannelLimitError, isChannelReadOnlyByBillingFeature, withServerLock, withServerResourceLock } from "./planService";
@@ -8988,7 +8989,7 @@ async function getFollowedThreadStatsRows(
     return getFollowedThreadStatsFromPostgres(userId, threads, historyCutoff, traceQuery, "activity_upper_bound");
   }
 
-  const override = getActivityReadSourceOverride();
+  const override = getActivityReadSource();
   if (override) return override.followedThreadStats({ serverId, userId, threads, traceQuery });
 
   // RisingWave only, for every follow state: unconfigured or a failed read errors.
@@ -9561,7 +9562,7 @@ async function readFollowedThreadRwRows(
   userId: string,
   traceQuery: DbQueryTracer,
 ): Promise<FollowedThreadRwRow[]> {
-  const override = getActivityReadSourceOverride();
+  const override = getActivityReadSource();
   if (override) return override.followedThreadRows({ serverId, userId, traceQuery });
   const pool = getRisingWaveInboxPool();
   if (!pool) throw new RisingWaveNotConfiguredError("followed threads");
@@ -11474,7 +11475,7 @@ export async function getActivityUnreadTotalsBatch(
   const traceQuery = opts.traceQuery ?? untracedDbQuery;
   const uniqueInputs = [...new Map(inputs.map((input) => [input.serverId, input])).values()];
   if (uniqueInputs.length === 0) return new Map();
-  const override = getActivityReadSourceOverride();
+  const override = getActivityReadSource();
   if (override) return override.activityUnreadTotals(uniqueInputs, userId, { traceQuery });
   // Totals come from the SAME materialized view family as the Activity list —
   // one source, watermark included, so the historical cross-surface divergence
@@ -11950,7 +11951,7 @@ export async function getInboxItems(
       ? "guest_policy_not_projected"
       : "forced_canonical";
   if (!useCanonicalPostgres) {
-    const override = getActivityReadSourceOverride();
+    const override = getActivityReadSource();
     if (override) return override.inboxItems(serverId, userId, { ...opts, q });
     const risingWaveResult = await getInboxItemsFromRisingWave(serverId, userId, {
       filter,
@@ -14028,7 +14029,7 @@ function nullableText(value: unknown): string | null {
 async function readConversationUnreadSummaryRows(
   query: ConversationUnreadSummaryQuery,
 ): Promise<ConversationUnreadRead<ConversationUnreadRow[]>> {
-  const override = getConversationUnreadSourceOverride();
+  const override = getConversationUnreadSource();
   if (override) return { rows: await override.summaryRows(query), rwAttrs: {} };
   const pool = getRisingWaveInboxPool();
   if (!pool) throw new RisingWaveNotConfiguredError("sidebar unread");
@@ -14095,7 +14096,7 @@ async function readConversationUnreadSummaryRows(
 async function readSidebarUnreadTotals(
   query: SidebarUnreadTotalsQuery,
 ): Promise<ConversationUnreadRead<Array<{ serverId: string; unreadCount: number }>>> {
-  const override = getConversationUnreadSourceOverride();
+  const override = getConversationUnreadSource();
   if (override) return { rows: await override.sidebarTotals(query), rwAttrs: {} };
   const pool = getRisingWaveInboxPool();
   if (!pool) throw new RisingWaveNotConfiguredError("sidebar unread totals");
@@ -14730,7 +14731,7 @@ function toNullableNumber(value: unknown): number | null {
  */
 export async function selectAgentInboxChainRows(agentId: string): Promise<AgentInboxChainSelection> {
   const pool = getRisingWaveInboxPool();
-  if (!pool) return { source: "unavailable", reason: "rw_unconfigured" };
+  if (!pool && !isStandaloneMode()) return { source: "unavailable", reason: "rw_unconfigured" };
   try {
     return { source: "chain", rows: await readAgentInboxChainRows(pool, agentId) };
   } catch (error) {
@@ -14753,10 +14754,15 @@ export type AgentInboxChainReadOptions = {
 
 /** Read one agent's rows from the agent inbox view. Throws on query failure. */
 export async function readAgentInboxChainRows(
-  pool: NonNullable<ReturnType<typeof getRisingWavePool>>,
+  pool: ReturnType<typeof getRisingWavePool>,
   agentId: string,
   opts: AgentInboxChainReadOptions = {},
 ): Promise<AgentInboxChainRow[]> {
+  if (isStandaloneMode()) {
+    const { readPostgresAgentInboxRows } = await import("./postgresAgentInboxSource");
+    return readPostgresAgentInboxRows(agentId, opts);
+  }
+  if (!pool) throw new AgentInboxUnavailableError("Agent inbox source is not configured");
   const values: unknown[] = [agentId];
   const where = ["agent_id = $1"];
   if (opts.kind !== undefined) {
@@ -14814,9 +14820,14 @@ export type AgentInboxTotals = { conversations: number; dms: number; mentions: n
 
 /** The agent's inbox totals, counted in the view. Throws on query failure. */
 export async function readAgentInboxChainTotals(
-  pool: NonNullable<ReturnType<typeof getRisingWavePool>>,
+  pool: ReturnType<typeof getRisingWavePool>,
   agentId: string,
 ): Promise<AgentInboxTotals> {
+  if (isStandaloneMode()) {
+    const { readPostgresAgentInboxTotals } = await import("./postgresAgentInboxSource");
+    return readPostgresAgentInboxTotals(agentId);
+  }
+  if (!pool) throw new AgentInboxUnavailableError("Agent inbox source is not configured");
   const read = await queryRisingWaveInbox(pool, `SELECT
       count(*) AS conversations,
       count(*) FILTER (WHERE kind = 'dm') AS dms,
@@ -15071,7 +15082,7 @@ export async function listAgentInbox(
   opts: { view: AgentInboxView; beforeSeq?: number; limit: number },
 ): Promise<AgentInboxList> {
   const pool = getRisingWaveInboxPool();
-  if (!pool) throw new AgentInboxUnavailableError("Agent inbox source is not configured");
+  if (!pool && !isStandaloneMode()) throw new AgentInboxUnavailableError("Agent inbox source is not configured");
   let totals: AgentInboxTotals;
   let dmRows: AgentInboxChainRow[];
   try {

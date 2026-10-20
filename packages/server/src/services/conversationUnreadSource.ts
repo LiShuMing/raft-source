@@ -1,13 +1,5 @@
-/**
- * Row shapes of the sidebar unread reader (rw_conversation_unread_v3, see
- * infra/risingwave/sql/076-cursor-decouple-consumers.sql) and its test seam.
- *
- * This module is deliberately tiny and dependency-free so the server test setup
- * can install the Postgres reference (src/test/conversationUnreadReference.ts)
- * without importing channelService. Production never sets the override: the
- * reader in channelService queries RisingWave, and with no RisingWave (or a
- * failed read) the request fails -- there is no second source.
- */
+/** Sidebar source selection is explicit: standard RisingWave or standalone PostgreSQL. */
+import { isStandaloneMode } from "../config/deploymentMode";
 
 /** One (user, conversation) row of the sidebar unread read. */
 export type ConversationUnreadRow = {
@@ -57,6 +49,17 @@ export type ConversationUnreadSource = {
   sidebarTotals(query: SidebarUnreadTotalsQuery): Promise<Array<{ serverId: string; unreadCount: number }>>;
 };
 
+const standaloneSource: ConversationUnreadSource = {
+  async summaryRows(query) {
+    const { postgresConversationUnreadSource } = await import("./postgresConversationUnreadSource");
+    return postgresConversationUnreadSource.summaryRows(query);
+  },
+  async sidebarTotals(query) {
+    const { postgresConversationUnreadSource } = await import("./postgresConversationUnreadSource");
+    return postgresConversationUnreadSource.sidebarTotals(query);
+  },
+};
+
 let testSource: ConversationUnreadSource | null = null;
 
 /** TEST-ONLY: replace the RisingWave read with another source (null restores RisingWave). */
@@ -64,6 +67,9 @@ export function __setConversationUnreadSourceForTests(source: ConversationUnread
   testSource = source;
 }
 
-export function getConversationUnreadSourceOverride(): ConversationUnreadSource | null {
-  return testSource;
+export function getConversationUnreadSource(): ConversationUnreadSource | null {
+  return testSource ?? (isStandaloneMode() ? standaloneSource : null);
 }
+
+/** Compatibility name for tests that snapshot the installed source. */
+export const getConversationUnreadSourceOverride = getConversationUnreadSource;

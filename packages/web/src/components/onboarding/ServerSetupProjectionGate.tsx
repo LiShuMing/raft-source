@@ -559,6 +559,7 @@ export default function ServerSetupProjectionGate({
 
   const computerRuntimeStep = (
       <ServerSetupComputerRuntimeStep
+        serverId={serverId}
         computer={computer}
         runtimeStatus={runtimeStatusFromProjection}
         runtimeOptions={authoritative.runtimeOptions ?? NO_RUNTIME_OPTIONS}

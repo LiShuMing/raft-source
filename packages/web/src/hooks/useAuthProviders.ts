@@ -11,11 +11,17 @@ export interface AuthProvider {
 
 const DEFAULT_PROVIDERS: AuthProvider[] = [];
 
-let cachedProviders: AuthProvider[] | null = null;
-let providersRequest: Promise<AuthProvider[]> | null = null;
+interface AuthConfiguration {
+  providers: AuthProvider[];
+  standalone: boolean;
+}
+
+const DEFAULT_CONFIGURATION: AuthConfiguration = { providers: DEFAULT_PROVIDERS, standalone: false };
+let cachedConfiguration: AuthConfiguration | null = null;
+let providersRequest: Promise<AuthConfiguration> | null = null;
 
 export function __resetAuthProvidersForTest(): void {
-  cachedProviders = null;
+  cachedConfiguration = null;
   providersRequest = null;
 }
 
@@ -39,24 +45,28 @@ function normalizeProviders(data: unknown): AuthProvider[] {
     }));
 }
 
-async function fetchAuthProviders(): Promise<AuthProvider[]> {
-  if (cachedProviders) return cachedProviders;
+async function fetchAuthProviders(): Promise<AuthConfiguration> {
+  if (cachedConfiguration) return cachedConfiguration;
   if (!providersRequest) {
     providersRequest = api.get("/auth/providers")
-      .then(({ data }) => normalizeProviders(data))
-      .catch(() => DEFAULT_PROVIDERS)
+      .then(({ data }) => ({
+        providers: normalizeProviders(data),
+        standalone: data?.deploymentMode === "standalone",
+      }))
+      .catch(() => DEFAULT_CONFIGURATION)
       .finally(() => {
         providersRequest = null;
       });
   }
 
-  cachedProviders = await providersRequest;
-  return cachedProviders;
+  cachedConfiguration = await providersRequest;
+  return cachedConfiguration;
 }
 
 export function useAuthProviders() {
-  const [providers, setProviders] = useState<AuthProvider[]>(cachedProviders ?? DEFAULT_PROVIDERS);
-  const [loading, setLoading] = useState(!cachedProviders);
+  const [configuration, setConfiguration] = useState<AuthConfiguration>(cachedConfiguration ?? DEFAULT_CONFIGURATION);
+  const { providers, standalone } = configuration;
+  const [loading, setLoading] = useState(!cachedConfiguration);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,10 +75,10 @@ export function useAuthProviders() {
       try {
         const data = await fetchAuthProviders();
         if (!cancelled) {
-          setProviders(data);
+          setConfiguration(data);
         }
       } catch {
-        if (!cancelled) setProviders(DEFAULT_PROVIDERS);
+        if (!cancelled) setConfiguration(DEFAULT_CONFIGURATION);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -90,5 +100,5 @@ export function useAuthProviders() {
     [providers],
   );
 
-  return { providers, enabledProviders, loading };
+  return { providers, enabledProviders, loading, standalone };
 }

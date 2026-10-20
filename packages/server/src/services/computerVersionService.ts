@@ -21,6 +21,7 @@ import {
   normalizeComputerReleaseNotes,
 } from "@botiverse/raft-shared";
 import type { ComputerReleaseNotes } from "@botiverse/raft-shared";
+import { isStandaloneMode } from "../config/deploymentMode";
 
 let cachedLatestComputerVersion: string | null = null;
 let cachedLatestComputerReleaseNotes: ComputerReleaseNotes | null = null;
@@ -38,6 +39,7 @@ const HANDS_LATEST_BUILD_URL =
   "https://hands.build/public/v2/apps/raft-computer-cli/latest?channel=main";
 
 export function getLatestComputerVersion(): Promise<string | null> {
+  if (isStandaloneMode()) return Promise.resolve(null);
   const now = Date.now();
   if (cachedLatestComputerVersion && now - lastFetchTime < REFRESH_INTERVAL_MS) {
     return Promise.resolve(cachedLatestComputerVersion);
@@ -93,6 +95,7 @@ async function fetchLatestComputerReleaseNotes(): Promise<void> {
 
 /** Cached notes for exactly the cached latest version; null otherwise. Never fetches. */
 export function getLatestComputerReleaseNotes(): ComputerReleaseNotes | null {
+  if (isStandaloneMode()) return null;
   const notes = cachedLatestComputerReleaseNotes;
   if (!notes || !cachedLatestComputerVersion) return null;
   return notes.version === cachedLatestComputerVersion ? notes : null;

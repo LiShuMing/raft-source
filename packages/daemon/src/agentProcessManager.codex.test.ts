@@ -9618,6 +9618,34 @@ test("task #352: provider plan-without-model 429 is surfaced as model-access act
   }, { driver });
 });
 
+test("Claude gateway model denial remains actionable after turn end", async () => {
+  const driver = new FakeCodexDriver({
+    id: "claude",
+    supportsStdinNotification: true,
+    busyDeliveryMode: "direct",
+  });
+
+  await withManager(async ({ driver, sent, manager }) => {
+    await manager.startAgent("agent-1", makeConfig({ runtime: "claude", model: "opus", sessionId: "session-1" }));
+    driver.parsedLines.set("model-denied", [{
+      kind: "error",
+      message: 'Failed to authenticate. API Error: 403 data: {"error":{"message":"该模型需要授权,model:claude-opus-4-8","type":"invalid_request_error"}}',
+    }]);
+    driver.processes[0].stdout.emit("data", Buffer.from("model-denied\n"));
+    driver.parsedLines.set("end", [{ kind: "turn_end", sessionId: "session-1" }]);
+    driver.processes[0].stdout.emit("data", Buffer.from("end\n"));
+    await flush();
+
+    const errorEvent = findLastActivity(sent, "error");
+    assert.ok(errorEvent && errorEvent.type === "agent:activity");
+    assert.match(errorEvent.detail, /does not include access to the configured model \(opus\)/);
+    assert.doesNotMatch(errorEvent.detail, /not logged in|log in/i);
+    assert.equal(errorEvent.runtimeError?.requiredAction, "user_model_access");
+    const activities = sent.filter((event) => event.type === "agent:activity");
+    assert.notEqual(activities.at(-1)?.activity, "online");
+  }, { driver });
+});
+
 test("spawn auth failures are surfaced as action-oriented activity", async () => {
   const driver = new FakeCodexDriver({
     id: "claude",

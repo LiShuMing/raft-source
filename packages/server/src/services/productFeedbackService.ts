@@ -1,4 +1,6 @@
 import { createHmac } from "node:crypto";
+import { isStandaloneMode } from "../config/deploymentMode";
+import { requireExternalService } from "../config/privacyPolicy";
 import type { Brand } from "@botiverse/raft-shared";
 
 export type ProductFeedbackKind = "idea" | "problem";
@@ -250,6 +252,7 @@ type ProductFeedbackServiceConfig = {
 };
 
 export function isProductFeedbackConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (isStandaloneMode(env)) return false;
   return Boolean(
     env.HANDS_FEEDBACK_BASE_URL?.trim()
     && env.HANDS_FEEDBACK_APP_SLUG?.trim()
@@ -395,6 +398,7 @@ export async function submitProductFeedback(
     onUpstreamServerTiming?: (value: string | null) => void;
   } = {},
 ): Promise<ProductFeedbackReceipt> {
+  requireExternalService("Product feedback", options.env ?? process.env);
   const config = readConfig(options.env ?? process.env);
   const body = new FormData();
   body.set("message", input.message);

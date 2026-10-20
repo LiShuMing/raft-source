@@ -10,6 +10,19 @@ import GravatarAvatar from "../src/components/member/GravatarAvatar";
 
 afterEach(() => {
   cleanup();
+  document.querySelector('meta[name="raft-deployment-mode"]')?.remove();
+});
+
+test("standalone never mounts an external avatar probe and keeps uploaded local avatars", () => {
+  const meta = document.createElement("meta");
+  meta.name = "raft-deployment-mode";
+  meta.content = "standalone";
+  document.head.append(meta);
+  const first = render(<GravatarAvatar gravatarHash="private-hash" avatarUrl="https://audit.invalid/api/avatars/users/abcd.webp" />);
+  assert.equal(first.container.querySelector("img"), null);
+  first.unmount();
+  const second = render(<GravatarAvatar gravatarHash="private-hash" avatarUrl="/api/avatars/users/abcd.webp" />);
+  assert.equal(second.container.querySelector("img")?.getAttribute("src"), "/api/avatars/users/abcd.webp");
 });
 
 test("GravatarAvatar shows the User placeholder until the Gravatar loads", () => {

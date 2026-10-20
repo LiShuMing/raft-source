@@ -54,6 +54,15 @@ function codexToolingObservation(
   };
 }
 
+test("standalone Codex launch disables analytics, feedback and trace export explicitly", () => {
+  const args = buildCodexAppServerArgs(null, true);
+  assert.deepEqual(args, [
+    "app-server", "-c", "analytics.enabled=false", "-c", "feedback.enabled=false",
+    "-c", 'otel.exporter="none"', "--listen", "stdio://",
+  ]);
+  assert.deepEqual(buildCodexAppServerArgs(), ["app-server", "--listen", "stdio://"]);
+});
+
 test("codex app-server receives only the launch-scoped managed MCP loopback URL", () => {
   assert.deepEqual(buildCodexAppServerArgs({
     name: "raft_managed",
