@@ -415,9 +415,15 @@ async function bootstrap() {
   // and never throws; see db/poolPrewarm.ts.
   await prewarmPrimaryPool();
 
-  // Start server
+  // Start server. Standalone defaults to loopback; `RAFT_STANDALONE_HOST` lets a
+  // container publish it (a Docker port mapping forwards to the container's
+  // interface, not its loopback), so the operator opts in explicitly instead of
+  // the profile widening its own bind. Unset keeps the previous behaviour.
+  const listenHost = STANDALONE
+    ? (process.env.RAFT_STANDALONE_HOST?.trim() || "127.0.0.1")
+    : "0.0.0.0";
   trackHttpServer(server);
-  server.listen(PORT, STANDALONE ? "127.0.0.1" : "0.0.0.0", () => {
+  server.listen(PORT, listenHost, () => {
     slackBridge?.start();
     void localComputerManager?.resume().catch(() => {
       console.warn("[Raft standalone] Could not resume local Computers");
