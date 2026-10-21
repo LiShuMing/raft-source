@@ -5,7 +5,7 @@ import { useIntl } from "react-intl";
 import type { ComputerCommandPlatform } from "../../utils/computerSetupCommand";
 import SectionEyebrow from "../ui/SectionEyebrow";
 import { CommandRow } from "./CommandRow";
-import LocalComputerConnect from "./LocalComputerConnect";
+import StandaloneComputerConnect from "./StandaloneComputerConnect";
 
 interface ComputerCommandGuideProps {
   localServerId?: string | null;
@@ -105,7 +105,7 @@ function CommandRows({
 }
 
 export default function ComputerCommandGuide(props: ComputerCommandGuideProps) {
-  if (props.localServerId) return <LocalComputerConnect key={props.localServerId} serverId={props.localServerId} />;
+  if (props.localServerId) return <StandaloneComputerConnect key={props.localServerId} serverId={props.localServerId} />;
   return <RemoteComputerCommandGuide {...props} />;
 }
 

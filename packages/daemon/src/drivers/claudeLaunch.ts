@@ -106,10 +106,12 @@ export function buildClaudeArgs(
     "--output-format", "stream-json",
     "--input-format", "stream-json",
     "--include-partial-messages",
-    "--model", launchRuntimeFields.model || "sonnet",
     "--disallowed-tools", CLAUDE_DISALLOWED_TOOLS,
     "--append-system-prompt-file", opts.standingPromptFilePath,
   ];
+
+  // An empty projection means Claude resolves its own machine/project settings.
+  if (launchRuntimeFields.model) args.push("--model", launchRuntimeFields.model);
 
   if (launchRuntimeFields.reasoningEffort) {
     args.push("--effort", launchRuntimeFields.reasoningEffort);

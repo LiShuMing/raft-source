@@ -1,7 +1,7 @@
 {
   "protocolVersion": 1,
   "runtimeId": "claude",
-  "schemaVersion": "claude.create.v1",
+  "schemaVersion": "claude.create.v2",
   "sourceId": "model",
   "kind": "select",
   "pointer": "/model",

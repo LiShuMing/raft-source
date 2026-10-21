@@ -22,7 +22,7 @@ import type {
   RuntimeModeConfig,
 } from "@botiverse/raft-shared";
 
-export type RuntimeProviderMode = "default" | "custom";
+export type RuntimeProviderMode = "machine" | "default" | "custom";
 
 /** Stable codes for UI localization; `message` remains English for logs/tests. */
 export type RuntimeConfigBuildErrorCode =
@@ -243,6 +243,7 @@ export function runtimeConfigApiKey(config: RuntimeConfig): string {
 }
 
 export function runtimeConfigProviderMode(config: RuntimeConfig): RuntimeProviderMode {
+  if (config.runtime === "claude" && config.model.kind === "machine") return "machine";
   return config.provider?.kind === "custom" ? "custom" : "default";
 }
 
@@ -342,11 +343,13 @@ export function buildRuntimeConfig(input: {
             : { kind: "default" as const },
         }
       : {}),
-    model: isBuiltInGateway || input.customModelMode
+    model: runtime === "claude" && providerMode === "machine"
+      ? { kind: "machine" }
+      : isBuiltInGateway || input.customModelMode
       ? { kind: "custom", name: customModelName || getDefaultModel(runtime) }
       : { kind: "preset", id: input.model || getDefaultModel(runtime) },
-    mode,
-    reasoningEffort: input.reasoningEffort ?? null,
+    mode: runtime === "claude" && providerMode === "machine" ? { kind: "default" } : mode,
+    reasoningEffort: runtime === "claude" && providerMode === "machine" ? null : input.reasoningEffort ?? null,
     envVars: input.envVars ?? null,
     ...(supportsRuntimeCommand(runtime) && input.command?.trim()
       ? { command: input.command.trim() }

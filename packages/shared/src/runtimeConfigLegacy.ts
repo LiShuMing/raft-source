@@ -225,6 +225,7 @@ function parseModelConfig(
   legacyCustomModel?: string,
 ): RuntimeModelConfig {
   if (!isPlainRecord(value)) return modelConfigFromLegacy(runtimeModels, runtime, fallback);
+  if (runtime === "claude" && value.kind === "machine") return { kind: "machine" };
   if (value.kind === "custom" && typeof value.name === "string" && value.name.trim()) {
     return { kind: "custom", name: value.name.trim() };
   }
@@ -339,14 +340,15 @@ export function hydrateLegacyRuntimeConfigWithTrace(
         : undefined;
   const usesLegacyClaudeCustomProvider = runtime === "claude" && provider?.kind === "custom";
   const command = stored ? parseCommandConfig(runtime, storedConfig?.command) : undefined;
+  const machineSettings = runtime === "claude" && isPlainRecord(storedConfig?.model) && storedConfig.model.kind === "machine";
   const config = deps.composeRuntimeConfig({
     runtime,
     provider,
     model: stored
       ? parseModelConfig(deps.runtimeModels, runtime, storedConfig?.model, fallbackModel, usesLegacyClaudeCustomProvider, legacyClaudeCustomModel)
       : modelConfigFromLegacy(deps.runtimeModels, runtime, fallbackModel),
-    mode: stored ? parseModeConfig(storedConfig?.mode) : { kind: "default" },
-    reasoningEffort: (storedConfig?.reasoningEffort as RuntimeReasoningEffort | null | undefined)
+    mode: !machineSettings && stored ? parseModeConfig(storedConfig?.mode) : { kind: "default" },
+    reasoningEffort: machineSettings ? null : (storedConfig?.reasoningEffort as RuntimeReasoningEffort | null | undefined)
       ?? input.reasoningEffort
       ?? null,
     // Runtime-owned env vars are legacy launch mirrors for provider/model

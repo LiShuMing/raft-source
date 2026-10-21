@@ -528,6 +528,8 @@ export interface AgentModelSeenItem {
 export const MODEL_SEEN_MAX_ITEMS_PER_REPORT = 50;
 
 export const DAEMON_CAPABILITY_MODEL_SEEN_BOUNDARY = "agent:model-seen-boundary";
+/** The Computer understands Claude's machine model policy and omits --model. */
+export const DAEMON_CAPABILITY_CLAUDE_MACHINE_SETTINGS = "claude:machine-settings-v1";
 /**
  * RFC 069 §8: the daemon reports agent state only through sequenced, replayed
  * `agent:status` frames (`daemonInstanceId` + `clientSeq`, same counter as
@@ -1829,7 +1831,8 @@ export const PI_BUILTIN_PROVIDER_CONNECTION_PROBES = PI_BUILTIN_PROVIDER_CONNECT
 
 export type RuntimeModelConfig =
   | { kind: "preset"; id: string }
-  | { kind: "custom"; name: string };
+  | { kind: "custom"; name: string }
+  | { kind: "machine" };
 
 export type RuntimeModeConfig =
   | { kind: "default" }
@@ -3367,6 +3370,11 @@ function runtimeConfigError(reason: RuntimeConfigParseReason, error: string, run
 function parseStrictModelConfig(runtime: string, value: unknown): RuntimeModelConfig | string {
   if (!isPlainRecord(value)) return "runtimeConfig.model must be an object";
   if (hasUnknownFields(value, MODEL_CONFIG_FIELDS)) return "runtimeConfig.model contains unknown fields";
+  if (value.kind === "machine") {
+    return runtime === "claude" && Object.keys(value).length === 1
+      ? { kind: "machine" }
+      : "runtimeConfig.model machine is only supported for Claude without a model override";
+  }
   if (value.kind === "custom") {
     return typeof value.name === "string" && value.name.trim()
       ? { kind: "custom", name: value.name.trim() }
@@ -3651,14 +3659,17 @@ export function parseRuntimeConfig(input: RuntimeConfigHydrationInput): RuntimeC
         : "invalid_provider";
     return runtimeConfigError(reason, provider, runtime, rawProviderKind);
   }
+  if (model.kind === "machine" && (provider?.kind !== "default" || mode.kind !== "default" || raw.reasoningEffort != null)) {
+    return runtimeConfigError("invalid_model", "Machine settings cannot be combined with provider, mode or reasoning overrides", runtime, rawProviderKind);
+  }
   if (runtime === "builtin" && provider?.kind === "preset") {
     if (model.kind === "custom") {
       const result = runtimeConfigError("invalid_model", "runtimeConfig.model.kind custom is not supported for runtime: builtin", runtime, rawProviderKind);
       return { ...result, trace: { ...result.trace, provider_id: provider.providerId, model_kind: model.kind } };
     }
-    if (!isBuiltInProviderModel(provider.providerId, model.id)) {
+    if (model.kind !== "preset" || !isBuiltInProviderModel(provider.providerId, model.id)) {
       const result = runtimeConfigError("invalid_model", `runtimeConfig.model.id is not supported for Built-in provider ${provider.providerId}`, runtime, rawProviderKind);
-      return { ...result, trace: { ...result.trace, provider_id: provider.providerId, model_kind: model.kind, model_id: model.id } };
+      return { ...result, trace: { ...result.trace, provider_id: provider.providerId, model_kind: model.kind, ...(model.kind === "preset" ? { model_id: model.id } : {}) } };
     }
   }
   if (runtime === "builtin" && provider?.kind === "gateway" && model.kind !== "custom") {
@@ -3695,7 +3706,7 @@ export function parseRuntimeConfig(input: RuntimeConfigHydrationInput): RuntimeC
     }
   }
 
-  const reasoningEffort = parseStrictReasoningEffortConfig(runtime, raw.reasoningEffort ?? input.reasoningEffort ?? null);
+  const reasoningEffort = parseStrictReasoningEffortConfig(runtime, model.kind === "machine" ? null : raw.reasoningEffort ?? input.reasoningEffort ?? null);
   if (!reasoningEffort.ok) {
     return runtimeConfigError(reasonForValidationError(reasoningEffort.error), reasoningEffort.error, runtime, rawProviderKind);
   }
@@ -3729,6 +3740,7 @@ export function parseRuntimeConfig(input: RuntimeConfigHydrationInput): RuntimeC
 }
 
 export function runtimeConfigModelValue(config: RuntimeConfig): string {
+  if (config.model.kind === "machine") return "";
   return config.model.kind === "custom" ? config.model.name : config.model.id;
 }
 

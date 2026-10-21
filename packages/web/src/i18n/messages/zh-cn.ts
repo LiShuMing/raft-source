@@ -9,6 +9,16 @@
 import type { MessageId } from "./en";
 
 export const zhCn: Record<MessageId, string> = {
+  "agent.claudeSettings.target": "执行机器：{name}",
+  "agent.claudeSettings.online": "在线",
+  "agent.claudeSettings.offline": "离线，无法读取配置",
+  "agent.claudeSettings.machineHint": "使用这台 Computer 上的 Claude 配置（包括 ~/.claude/settings.json）和凭据。模型由启动时的配置决定，此处未验证实际模型；配置冲突时遵循 Claude 自身的优先级。",
+  "agent.claudeSettings.overrideHint": "使用这台 Computer 上的 Claude 连接和凭据，并指定所选模型。",
+  "agent.claudeSettings.customHint": "使用填写的地址、密钥和模型；这些凭据由本平台保存。",
+  "agent.claudeSettings.machine": "沿用机器配置",
+  "agent.claudeSettings.override": "仅覆盖模型",
+  "agent.claudeSettings.custom": "自定义连接",
+  "agent.claudeSettings.configuration": "配置方式",
 
   "auth.accountLink.mismatch": "你登录的不是 {email} 的账户，没有连接 {provider}。请用 {email} 登录。",
   "auth.accountLink.providerConflict": "这个 {provider} 账号已经连接到另一个 Raft 账户，没能连接到这里。",
@@ -1463,7 +1473,7 @@ export const zhCn: Record<MessageId, string> = {
   "agent.runtimeConfig.claudeCommandHint":
     "可执行文件路径或命令名；Slock 会追加 Claude stream-json 运行时参数。",
   "agent.runtimeConfig.providerHint":
-    "默认模式不改动 Claude Code 提供方设置。自定义模式会为此 Agent 设置 ANTHROPIC_BASE_URL 和 ANTHROPIC_API_KEY。",
+    "沿用所选执行机器上的 Claude 配置，不传入 --model；仅覆盖模型会保留该机器的连接。自定义连接会在本平台保存填写的凭据。高级环境变量可覆盖机器配置。",
   "agent.runtimeConfig.apiUrl": "API URL",
   "agent.runtimeConfig.apiUrlInvalid": "API URL 必须以 http:// 或 https:// 开头。",
   "agent.runtimeConfig.apiKey": "API 密钥",

@@ -39,6 +39,7 @@ import {
   REASONING_EFFORTS,
   RUNTIME_CONFIG_VERSION,
   RUNTIME_MODELS,
+  runtimeConfigModelValue,
   type AgentCreateFormIssue,
   type AgentCreateFormOption,
   type AgentCreateFormOptionSource,
@@ -723,7 +724,7 @@ const kimiSdkEntry: RuntimeFormV2Entry = {
  * `schemaVersion` only names the form the server built.
  */
 function simpleFormRef(runtimeId: string) {
-  return { protocolVersion: 1 as const, runtimeId, schemaVersion: `${runtimeId}.${isRuntimeDeprecated(runtimeId) ? "edit" : "create"}.v1` };
+  return { protocolVersion: 1 as const, runtimeId, schemaVersion: `${runtimeId}.${isRuntimeDeprecated(runtimeId) ? "edit" : "create"}.${runtimeId === "claude" ? "v2" : "v1"}` };
 }
 
 function buildSimpleForm(runtimeId: string, model: { hint?: string } | null): RuntimeFormV2Definition {
@@ -931,12 +932,13 @@ function reasoningModelCapabilities(options: ReasoningModelFormOptions): Runtime
 }
 
 /**
- * Claude's provider choice, as the legacy select offers it. The copy is the
- * legacy web form's English (agent.runtimeConfig.default / .custom / .providerHint).
+ * Form choices map to native settings, an explicit model, or a custom provider.
+ * Keep the existing default/custom values so saved agents retain their choices.
  */
 const CUSTOM_PROVIDER_OPTIONS = [
-  { value: "default", label: "Default" },
-  { value: "custom", label: "Custom" },
+  { value: "machine", label: "Machine settings" },
+  { value: "default", label: "Override model" },
+  { value: "custom", label: "Custom connection" },
 ] as const;
 
 /** Every field key of a form built with these options, in order. */
@@ -988,14 +990,16 @@ function buildReasoningModelForm(runtimeId: string, options: ReasoningModelFormO
         ? [
             { pointer: "/apiUrl", when: { pointer: "/provider", in: ["custom"] } },
             { pointer: "/apiKey", when: { pointer: "/provider", in: ["custom"] } },
+            ...["model", ...(options.reasoning ? ["reasoningEffort"] : []), ...(options.fastMode ? ["fastMode"] : [])]
+              .map((key) => ({ pointer: `/${key}`, when: { pointer: "/provider", in: ["default", "custom"] } })),
           ]
         : [],
       localization: {
         ...(options.customProvider
           ? {
               provider: {
-                label: "Provider",
-                hint: "Default leaves Claude Code provider settings untouched. Custom sets ANTHROPIC_BASE_URL and ANTHROPIC_API_KEY for this agent.",
+                label: "Configuration",
+                hint: "Machine settings is recommended: Claude resolves its own model without --model. Advanced environment variables can override native settings.",
               },
               apiUrl: { label: "API URL", placeholder: "https://gateway.example.com" },
               apiKey: { label: "API Key", placeholder: "sk-ant-..." },
@@ -1102,7 +1106,7 @@ function customProviderOptionSource(runtimeId: string): RuntimeFormV2OptionSourc
     kind: "select",
     pointer: "/provider",
     options: CUSTOM_PROVIDER_OPTIONS.map((option) => ({ ...option })),
-    defaultValue: "default",
+    defaultValue: "machine",
     customValueAllowed: false,
   };
 }
@@ -1191,7 +1195,7 @@ function customProviderFromValues(
   options: RuntimeFormValuesOptions,
 ): ProviderBuild {
   const mode = typeof values.provider === "string" ? values.provider.trim() : "";
-  if (mode === "default") return { ok: true, provider: { kind: "default" } };
+  if (mode === "default" || mode === "machine") return { ok: true, provider: { kind: "default" } };
   if (mode !== "custom") return formValueIssue("select_valid_provider", "provider") as ProviderBuild;
   const apiUrl = typeof values.apiUrl === "string" ? values.apiUrl.trim() : "";
   if (!/^https?:\/\//i.test(apiUrl)) return formValueIssue("api_url_invalid", "apiUrl") as ProviderBuild;
@@ -1235,6 +1239,25 @@ function reasoningModelFormEntry(runtimeId: string, options: ReasoningModelFormO
       };
     },
     runtimeConfigFromValues(values, envVars, valueOptions) {
+      // Hidden model/provider fields may still hold values from an earlier
+      // choice. Inheritance deliberately ignores them, including saved secrets.
+      if (options.customProvider && values.provider === "machine") {
+        if (values.command != null && typeof values.command !== "string") return formValueIssue("invalid_command", "command");
+        const command = typeof values.command === "string" ? values.command.trim() : "";
+        return {
+          ok: true,
+          runtimeConfig: {
+            version: RUNTIME_CONFIG_VERSION,
+            runtime: runtimeId,
+            provider: { kind: "default" },
+            model: { kind: "machine" },
+            mode: { kind: "default" },
+            reasoningEffort: null,
+            envVars,
+            ...(command ? { command } : {}),
+          },
+        };
+      }
       const modelValue = typeof values.model === "string" ? values.model.trim() : "";
       if (!modelValue) return formValueIssue("model_required", "model");
       // A form without a reasoning field ignores a stray value, like fastMode below.
@@ -1284,7 +1307,7 @@ function reasoningModelFormEntry(runtimeId: string, options: ReasoningModelFormO
         // The API key is write-only: never part of the values.
         ...(options.customProvider
           ? {
-              provider: custom ? "custom" : "default",
+              provider: isPlainRecord(runtimeConfig.model) && runtimeConfig.model.kind === "machine" ? "machine" : custom ? "custom" : "default",
               ...(custom ? { apiUrl: typeof provider.apiUrl === "string" ? provider.apiUrl : "" } : {}),
             }
           : {}),
@@ -1301,7 +1324,8 @@ function reasoningModelFormEntry(runtimeId: string, options: ReasoningModelFormO
     },
     ...(options.customProvider ? { writeOnlySecrets: [CLAUDE_CUSTOM_PROVIDER_API_KEY] } : {}),
     reconcileWithLiveModels(runtimeConfig, submittedReasoningEffort, models) {
-      const modelValue = runtimeConfig.model.kind === "custom" ? runtimeConfig.model.name : runtimeConfig.model.id;
+      if (runtimeConfig.model.kind === "machine") return { kind: "unchanged" };
+      const modelValue = runtimeConfigModelValue(runtimeConfig);
       const live = models.find((model) => model.id === modelValue);
       // Not in the live list: a custom model, or a bundled one this Computer
       // does not report. The static rule already applied stays final.
@@ -1674,7 +1698,7 @@ const piEntry: RuntimeFormV2Entry = {
     // Only the Configured provider's model comes from the Computer; a built-in
     // provider's model is checked against its own catalog.
     if (runtimeConfig.provider?.kind === "pi-builtin") return { kind: "unchanged" };
-    const modelValue = runtimeConfig.model.kind === "custom" ? runtimeConfig.model.name : runtimeConfig.model.id;
+    const modelValue = runtimeConfigModelValue(runtimeConfig);
     const live = models.find((model) => model.id === modelValue);
     if (!live) return { kind: "unchanged" };
     const efforts = reasoningModelOption("pi", live).supportedReasoningEfforts ?? [];

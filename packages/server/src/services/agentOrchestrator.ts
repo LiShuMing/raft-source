@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { assertClaudeMachineSettingsSupported } from "./claudeMachineSettings";
 import { closeConnectionsForDrain, MACHINE_DRAIN_CLOSE_CODE, MACHINE_DRAIN_CLOSE_REASON } from "./machineDrain";
 import crypto from "node:crypto";
 import type { Server as SocketServer } from "socket.io";
@@ -13804,6 +13805,10 @@ export class AgentOrchestrator extends EventEmitter {
     }
 
     const normalizedRuntimeConfig = hydrateRuntimeConfig(agent);
+    if (normalizedRuntimeConfig.model.kind === "machine") {
+      const carrier = await this.readProbeCarrierFact(agent.machineId);
+      assertClaudeMachineSettingsSupported(normalizedRuntimeConfig, carrier?.capabilities ?? []);
+    }
     const launchRuntimeFields = runtimeConfigToLaunchFields(normalizedRuntimeConfig);
     if (launchRuntimeFields.runtime === "kimi-sdk" && launchRuntimeFields.reasoningEffort !== null) {
       const detected = await this.detectMachineRuntimeModels(agent.machineId, "kimi-sdk");

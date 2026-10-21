@@ -1,7 +1,7 @@
 {
   "protocolVersion": 2,
   "runtimeId": "claude",
-  "schemaVersion": "claude.create.v1",
+  "schemaVersion": "claude.create.v2",
   "requiredClientCapabilities": [
     "select.custom_value",
     "choice.labels",
@@ -98,12 +98,42 @@
             "custom"
           ]
         }
+      },
+      {
+        "pointer": "/model",
+        "when": {
+          "pointer": "/provider",
+          "in": [
+            "default",
+            "custom"
+          ]
+        }
+      },
+      {
+        "pointer": "/reasoningEffort",
+        "when": {
+          "pointer": "/provider",
+          "in": [
+            "default",
+            "custom"
+          ]
+        }
+      },
+      {
+        "pointer": "/fastMode",
+        "when": {
+          "pointer": "/provider",
+          "in": [
+            "default",
+            "custom"
+          ]
+        }
       }
     ],
     "localization": {
       "provider": {
-        "label": "Provider",
-        "hint": "Default leaves Claude Code provider settings untouched. Custom sets ANTHROPIC_BASE_URL and ANTHROPIC_API_KEY for this agent."
+        "label": "Configuration",
+        "hint": "Machine settings is recommended: Claude resolves its own model without --model. Advanced environment variables can override native settings."
       },
       "apiUrl": {
         "label": "API URL",
@@ -175,7 +205,7 @@
     "provider": {
       "protocolVersion": 1,
       "runtimeId": "claude",
-      "schemaVersion": "claude.create.v1",
+      "schemaVersion": "claude.create.v2",
       "sourceId": "provider",
       "kind": "select",
       "pointer": "/provider"
@@ -183,7 +213,7 @@
     "model": {
       "protocolVersion": 1,
       "runtimeId": "claude",
-      "schemaVersion": "claude.create.v1",
+      "schemaVersion": "claude.create.v2",
       "sourceId": "model",
       "kind": "select",
       "pointer": "/model"

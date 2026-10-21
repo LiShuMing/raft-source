@@ -47,7 +47,7 @@ export class ClaudeDriver implements RuntimeDriver {
   } as const;
   readonly model = {
     detectedModelsVerifiedAs: "launchable",
-    toLaunchSpec: (modelId: string) => ({ args: ["--model", modelId] }),
+    toLaunchSpec: (modelId: string) => ({ args: modelId ? ["--model", modelId] : [] }),
   } as const;
   readonly supportsStdinNotification = true;
   readonly acceptsStdinDuringCompaction = true;

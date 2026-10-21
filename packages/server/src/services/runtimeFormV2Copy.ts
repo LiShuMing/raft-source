@@ -29,6 +29,7 @@ const ZH_CN: Readonly<Record<string, string>> = Object.freeze({
   "Model": "模型",
   "Model ID": "模型 ID",
   "Provider": "提供方",
+  "Configuration": "配置方式",
   "Reasoning": "推理强度",
   "Supports image input": "支持图片输入",
   "Thinking effort": "思考强度",
@@ -72,6 +73,11 @@ const ZH_CN: Readonly<Record<string, string>> = Object.freeze({
   "Maximum reasoning with automatic task delegation": "最大推理，并自动进行任务委派",
   "Lower latency": "更低延迟",
   // Generic option labels (model and provider names are never translated)
+  "Machine settings": "沿用机器配置",
+  "Override model": "仅覆盖模型",
+  "Custom connection": "自定义连接",
+  "Machine settings is recommended: Claude resolves its own model without --model. Advanced environment variables can override native settings.":
+    "推荐沿用机器配置，由 Claude 自行决定模型，不传入 --model。高级环境变量可覆盖机器配置。",
   "Auto": "自动",
   "Configured": "已配置",
   "Configured Default": "已配置的默认值",

@@ -79,6 +79,7 @@ import { SchemaBuiltInRuntimeFields } from "./SchemaBuiltInRuntimeFields";
 import { RuntimeEnvVarRow } from "./RuntimeEnvVarRow";
 import { RuntimeFormV2FieldControl } from "./RuntimeFormV2FieldControl";
 import { RuntimeChoiceCombobox } from "./RuntimeChoiceCombobox";
+import { ClaudeConfigurationSummary, type ExecutionComputer } from "./ClaudeConfigurationSummary";
 
 export const DEFAULT_REASONING_EFFORT_SELECT_VALUE = "__default_reasoning_effort__";
 
@@ -498,6 +499,7 @@ interface RuntimeConfigFieldsProps {
   runtimeLabel?: string;
   /** Optional explainer under the runtime select — onboarding users have no idea what a "runtime" is. */
   runtimeHint?: string;
+  executionComputer?: ExecutionComputer | null;
   /** Re-ask the computer which runtimes are installed. Omit to hide the control. */
   onRescanRuntimes?: () => void;
   runtimesRescanning?: boolean;
@@ -754,6 +756,7 @@ export default function RuntimeConfigFields({
   showRuntimeField = true,
   runtimeLabel,
   runtimeHint,
+  executionComputer,
   onRescanRuntimes,
   runtimesRescanning = false,
   envVarsMode = "inline",
@@ -792,6 +795,7 @@ export default function RuntimeConfigFields({
   const effectiveRuntimeLabel = runtimeLabel ?? formatMessage({ id: "agent.runtimeConfig.runtime" });
   const effectiveEnvVarsHint = envVarsHint ?? formatMessage({ id: "agent.runtimeConfig.envVarsHint" });
   const apiUrlSupported = supportsRuntimeApiUrl(runtime);
+  const claudeMachineSettings = runtime === "claude" && providerMode === "machine";
   const commandSupported = supportsRuntimeCommand(runtime);
   const customModelSupported = supportsRuntimeCustomModelName(runtime);
   const fastModeSupported = supportsRuntimeFastMode(runtime);
@@ -822,8 +826,9 @@ export default function RuntimeConfigFields({
   const providerModelList = builtInModelList ?? piBuiltinModelList;
   const machineSourceApplies = (!providerModelList && !builtInGatewayProvider) || builtInCatalogApplies;
   const providerModeOptions = useMemo((): RuntimeOption[] => [
-    { value: "default", label: formatMessage({ id: "agent.runtimeConfig.default" }) },
-    { value: "custom", label: formatMessage({ id: "agent.runtimeConfig.custom" }) },
+    { value: "machine", label: formatMessage({ id: "agent.claudeSettings.machine" }) },
+    { value: "default", label: formatMessage({ id: "agent.claudeSettings.override" }) },
+    { value: "custom", label: formatMessage({ id: "agent.claudeSettings.custom" }) },
   ], [formatMessage]);
   const builtInProviderOptions: RuntimeOption[] = BUILTIN_RUNTIME_ALL_PROVIDER_IDS.map((id) => ({
     value: id,
@@ -986,7 +991,7 @@ export default function RuntimeConfigFields({
   ) : null;
   const apiProviderFields = apiUrlSupported ? (
     <Field
-      label={formatMessage({ id: "agent.runtimeConfig.provider" })}
+      label={formatMessage({ id: "agent.claudeSettings.configuration" })}
       hint={formatMessage({ id: "agent.runtimeConfig.providerHint" })}
     >
       <RuntimeSelectControl
@@ -1109,8 +1114,8 @@ export default function RuntimeConfigFields({
   // The genuinely technical knobs. These are what "Advanced" is for.
   const technicalFields = (
     <>
-      {reasoningField}
-      {fastModeField}
+      {!claudeMachineSettings && reasoningField}
+      {!claudeMachineSettings && fastModeField}
     </>
   );
   const showAdvancedSection = technicalFieldsMode === "advanced" || envVarsMode === "advanced";
@@ -1146,6 +1151,12 @@ export default function RuntimeConfigFields({
         </Field>
       )}
 
+      {runtime === "claude" && executionComputer && (!runtimeFormV2 || (runtimeFormV2.state.status === "ready" && runtimeFormV2.values)) && (
+        <ClaudeConfigurationSummary
+          computer={executionComputer}
+          mode={runtimeFormV2?.values && typeof runtimeFormV2.values.provider === "string" ? runtimeFormV2.values.provider : providerMode}
+        />
+      )}
       {runtimeFormV2 ? (
         runtimeFormV2.state.status === "ready" && runtimeFormV2.values ? (
           <RuntimeFormV2Fields
@@ -1367,7 +1378,7 @@ export default function RuntimeConfigFields({
       {/* Dynamic required per cindyz: only the modes that actually enforce a model
           value carry the marker. A static asterisk would claim the select can be
           left empty, which it cannot. */}
-      <Field
+      {!claudeMachineSettings && <Field
         label={formatMessage({ id: "agent.runtimeConfig.model" })}
         required={customModelInputMode}
         // Was a conditional `<p>` in `belowControl`; moved to the slot for the
@@ -1449,7 +1460,7 @@ export default function RuntimeConfigFields({
             placeholder={formatMessage({ id: "agent.runtimeConfig.gatewayModelId" })}
           />
         )}
-      </Field>
+      </Field>}
 
       {technicalFieldsMode === "inline" && technicalFields}
 

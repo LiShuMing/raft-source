@@ -1,4 +1,5 @@
 import { Router, type Request, type Response, type Router as RouterType } from "express";
+import { isStandaloneMode } from "../config/deploymentMode";
 import type { RuntimeFormV2SubmitRef } from "@botiverse/raft-runtime-form";
 import type { Server as SocketServer } from "socket.io";
 import { broadcastAgentUpdated } from "./agentUpdatedBroadcast";
@@ -1499,6 +1500,10 @@ agentRouter.post("/", async (req, res) => {
     const { name, description, model, runtime, reasoningEffort, machineId, envVars, avatarUrl, actionCardMessageId, actionCardConfirmationVersion } = req.body;
     let { runtimeConfig, formDefinitionRef } = req.body;
     const external = req.body?.external === true;
+    if (isStandaloneMode() && !external && !machineId) {
+      res.status(400).json({ code: "execution_machine_required", error: "Select the Computer that will execute this agent" });
+      return;
+    }
     let v2Submitted = false;
     let v2SubmittedReasoningEffort: unknown = null;
     if (!external) {

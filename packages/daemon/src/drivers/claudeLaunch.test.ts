@@ -28,6 +28,23 @@ const config = {
   authToken: null,
 };
 
+test("machine settings leaves model, effort, fast mode and native setting sources to Claude", () => {
+  const args = buildClaudeArgs({
+    ...config,
+    model: "stale-opus",
+    authToken: "test-token",
+    reasoningEffort: "high",
+    runtimeConfig: {
+      version: 1,
+      runtime: "claude",
+      provider: { kind: "default" },
+      model: { kind: "machine" },
+      mode: { kind: "default" },
+    },
+  }, { standingPromptFilePath: "/tmp/test-prompt.md" });
+  for (const flag of ["--model", "--effort", "--settings", "--setting-sources"]) assert.equal(args.includes(flag), false, flag);
+});
+
 test("claude launch config disallows provider-native cron tools", () => {
   assert.equal(
     CLAUDE_DISALLOWED_TOOLS,

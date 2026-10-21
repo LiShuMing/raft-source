@@ -683,7 +683,7 @@ export default function CreateAgentDialog({
   const [customModelMode, setCustomModelMode] = useState(
     rememberedModelApplies ? rememberedConfig.customModelMode : false,
   );
-  const [providerMode, setProviderMode] = useState<RuntimeProviderMode>("default");
+  const [providerMode, setProviderMode] = useState<RuntimeProviderMode>("machine");
   const [providerApiUrl, setProviderApiUrl] = useState("");
   const [providerApiKey, setProviderApiKey] = useState("");
   const [builtInProviderMode, setBuiltInProviderMode] = useState<BuiltInProviderMode>(BUILTIN_RUNTIME_DEFAULT_PROVIDER_ID);
@@ -739,7 +739,7 @@ export default function CreateAgentDialog({
   // former "builtin stays on v1" stopgap is gone — the v2 form carries the
   // saved/direct picker itself.
   const runtimeFormV2Flag = useServerFeatureFlag(RUNTIME_FORM_V2_WEB_FLAG_KEY).enabled;
-  const v2Eligible = runtimeFormV2Flag
+  const v2Eligible = (runtimeFormV2Flag || runtime === "claude")
     && selectedRuntimeAdmission?.runtimeFormV2?.protocolVersion === 2
     && !selectedProviderConnection && !onboarding && !previewOnly;
   const runtimeFormV2 = useRuntimeFormV2(v2Eligible ? selectedMachineId : null, v2Eligible ? runtime : null);
@@ -876,7 +876,7 @@ export default function CreateAgentDialog({
   const schemaModelAllowsSubmit = schemaModelSource?.kind === "select"
     ? schemaModelSource.options.some((option) => option.value === model)
     : false;
-  const modelSourceAllowsSubmit = schemaBacked
+  const modelSourceAllowsSubmit = runtime === "claude" && providerMode === "machine" ? true : schemaBacked
     ? schemaModelAllowsSubmit || runtimeFormDefinition.definition?.runtimeId === "builtin"
     : (runtime === "codex" && !schemaBacked) || runtimeModelSelectionIsRunnable({
     runtime,
@@ -1318,7 +1318,7 @@ export default function CreateAgentDialog({
       (!v2Active && builtInApiKeyInvalid) ||
       (!v2Active && builtInBaseUrlMissing) ||
       piApiKeyInvalid ||
-      (!v2Active && (customModelMode || builtInGatewayModelRequired) && !model.trim())
+      (!v2Active && !(runtime === "claude" && providerMode === "machine") && (customModelMode || builtInGatewayModelRequired) && !model.trim())
     ));
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -2107,6 +2107,7 @@ export default function CreateAgentDialog({
             <RuntimeConfigFields
               showValidationErrors={validationAttempted}
               runtimeFormV2={runtimeFormV2Prop}
+              executionComputer={selectedMachine}
               runtime={runtime}
               onRuntimeChange={handleRuntimeChange}
               runtimeOptions={runtimeOptions}

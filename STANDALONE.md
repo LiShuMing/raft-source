@@ -118,6 +118,76 @@ self-hosted server URL even when no deployment label is configured. Automatic
 upgrades of the source-built local runner are not managed by a global CLI; rebuild
 and restart this checkout to update it.
 
+## Remote execution machines
+
+Standalone supports one center and multiple execution machines. In **Connect a
+Computer**, choose **Server host** or **Another machine**. The remote flow serves
+a private runner archive from the authenticated center; only workspace owners
+and admins with `registerMachines` can download it. The archive contains the
+built original daemon and the installed production dependency graph, including
+dependency licenses. It contains no center database, JWT key, native credentials
+or user state. No registry install or vendor installer runs on the target.
+
+`pnpm standalone:build` builds the runner package as well as the original web
+application. After rebuilding the daemon separately, use
+`pnpm standalone:remote:build` to refresh the package. The package is specific to
+the build host's OS/architecture and requires Node 24+ on the target. Set
+`RAFT_NODE_BIN` when Node is not available as `node`. The page displays the
+archive SHA-256; verify it after transfer before extracting and executing it.
+
+For the current loopback-only center, run this on the execution machine, replacing
+the SSH destination, and keep the tunnel open:
+
+```sh
+ssh -N -o ExitOnForwardFailure=yes \
+  -L 127.0.0.1:15280:127.0.0.1:5280 admin@ADMIN_HOST
+```
+
+In another terminal on that machine, after extracting the archive:
+
+```sh
+cd raft-runner
+./connect setup --server-url http://127.0.0.1:15280 \
+  --server allinone-dev1 --name dev-b
+```
+
+Open `/login/device` on the center in your existing browser and approve the
+code printed by this runner. The runner reuses the existing device authorization,
+Computer attachment and authenticated daemon WebSocket protocols. It creates a
+unique Computer identity and stores its key locally with mode 0600. The human
+session is used only for attachment and is not saved by this runner. A subsequent
+setup resumes the saved attachment; `start` with the same flags starts it without
+requesting another approval. `status` prints local identity without credentials.
+The runner stays in the foreground; keep the terminal open or supervise this
+command with your own user service. No OS service is installed automatically.
+
+Each center/workspace gets an isolated default state directory under
+`~/.raft-standalone/remote/`. `RAFT_HOME` can override it, but must be a private
+directory. Hostname, OS username and native home are checked on restart to catch
+accidentally copied attachments. This check is not hardware attestation. Never
+clone machine credentials or native session directories. An interrupted enrollment
+or a changed host identity requires operator recovery rather than silent issuance
+of replacement credentials.
+
+Create an agent in the center and explicitly select its Computer. The picker
+shows the reported hostname; the agent profile also shows its execution host and
+machine ID. Standalone rejects native agent creation without a selected machine.
+An offline Computer is not replaced by the center host. Changing the machine
+assignment and migrating its files/sessions remain separate existing operations.
+
+The original daemon creates each agent's managed workspace on its execution
+machine. Local Claude/Codex configuration and provider login are read there, under
+the runner's OS user. Native project paths refer to that host. Separate OS users
+or an actual sandbox are required for file access isolation; a working directory,
+display name or `RAFT_HOME` is not a filesystem permission boundary.
+
+Remote runners apply the same nonessential-traffic and telemetry flags as the
+bundled local runner before loading the original daemon. They accept HTTPS center
+origins, or HTTP loopback for tunnels, reject redirects during device enrollment,
+and never silently use the public Raft API. Native models and tools retain their
+existing network authority, as described below. Multi-center replicas, shared
+PGlite directories and transparent native-session failover are not enabled.
+
 ## Privacy defaults
 
 Standalone now applies an application privacy policy in addition to local

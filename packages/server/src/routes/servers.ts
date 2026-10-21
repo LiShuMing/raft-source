@@ -1,4 +1,5 @@
 import { localComputerRouter } from "../standalone/localComputerRoutes";
+import { remoteComputerRouter } from "../standalone/remoteComputerRoutes";
 import { setRequestTraceComputerTarget } from "../middleware/requestObservability";
 import { markAgentArchiveWorkspaceDeleted } from "../services/agentArchiveService";
 import { Router, type Request, type RequestHandler, type Router as RouterType } from "express";
@@ -4757,3 +4758,4 @@ serverRouter.patch("/:id/public-guest-join", async (req, res) => {
 
 // User authentication and verified-account checks are inherited from /api/servers.
 serverRouter.use("/:id/local-computer", localComputerRouter);
+serverRouter.use("/:id/remote-computer", remoteComputerRouter);

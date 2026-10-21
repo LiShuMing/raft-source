@@ -17,7 +17,7 @@ import DialogCard from "../ui/DialogCard";
 import FormField from "../ui/FormField";
 import Banner from "../ui/Banner";
 import ComputerCommandGuide from "./ComputerCommandGuide";
-import LocalComputerConnect from "./LocalComputerConnect";
+import StandaloneComputerConnect from "./StandaloneComputerConnect";
 import { useAuthProviders } from "../../hooks/useAuthProviders";
 
 /** A link-like action inside a banner sentence (Raft DS UI text link: ink,
@@ -36,11 +36,12 @@ type MachineType = "local" | "cloud";
 export default function AddMachineDialog(props: { onClose: () => void }) {
   const { standalone } = useAuthProviders();
   const serverId = useServerStore((state) => state.current?.id);
-  const { formatMessage } = useIntl();
   if (standalone && serverId) {
     return (
-      <DialogCard title={formatMessage({ id: "machine.local.connect" })} onClose={props.onClose}>
-        <LocalComputerConnect key={serverId} serverId={serverId} />
+      <DialogCard title="Connect a Computer" onClose={props.onClose} maxWidthClass="max-w-2xl">
+        <div className="max-h-[75dvh] overflow-y-auto overscroll-contain pr-1">
+          <StandaloneComputerConnect key={serverId} serverId={serverId} />
+        </div>
       </DialogCard>
     );
   }

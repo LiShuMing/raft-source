@@ -12,6 +12,7 @@ import { parseRuntimeFormV2 } from "@botiverse/raft-runtime-form";
 import {
   parseRuntimeConfig,
   RUNTIME_CONFIG_VERSION,
+  runtimeConfigModelValue,
   RUNTIME_MODELS,
   type RuntimeConfig,
   type RuntimeModelSourceOutcome,
@@ -152,7 +153,7 @@ test("antigravity: the form has no model field; the stored model is written back
     // (the field is ignored for Antigravity), so it sends the stored model.
     const legacy = legacyRuntimeConfig(
       "antigravity",
-      stored.model.kind === "custom" ? stored.model.name : stored.model.id,
+      runtimeConfigModelValue(stored),
       { NEW: "2" },
       stored.model.kind === "custom",
     );

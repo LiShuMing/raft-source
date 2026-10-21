@@ -238,14 +238,18 @@ test("model options carry efforts exactly like the legacy picker where the runti
   }
 });
 
-test("claude's provider source is static: Default/Custom, never probes, no status, no typed value", async () => {
+test("claude's configuration source defaults to machine settings without probing credentials", async () => {
   const { context, calls } = sourceContext(async () => { throw new Error("must not probe"); }, "confirmed_local", "provider");
   const resolution = await runtimeFormV2Entry("claude")!.resolveOptionSource(context);
   assert.equal(resolution.kind, "source");
   const source = wire((resolution as { source: unknown }).source);
   assert.deepEqual(calls, []);
-  assert.deepEqual(source.options, [{ value: "default", label: "Default" }, { value: "custom", label: "Custom" }]);
-  assert.equal(source.defaultValue, "default");
+  assert.deepEqual(source.options, [
+    { value: "machine", label: "Machine settings" },
+    { value: "default", label: "Override model" },
+    { value: "custom", label: "Custom connection" },
+  ]);
+  assert.equal(source.defaultValue, "machine");
   assert.equal(source.pointer, "/provider");
   assert.equal("status" in source, false);
   assert.equal(source.customValueAllowed, false);

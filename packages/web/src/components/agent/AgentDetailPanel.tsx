@@ -802,7 +802,9 @@ function AgentProfileInfo({ agent, canManageAgent, canChangeAgentRole, onOpenPro
   const currentRuntimeModelPresentation = activeRuntime === currentRuntimeConfig.runtime
     ? projectRuntimeModelLabelPresentation(currentRuntimeConfig.runtime, currentRuntimeModel, runtimeModels, agent.machineId)
     : { kind: "resolved" as const, label: getModelLabel(currentRuntimeConfig.runtime, currentRuntimeModel) };
-  const currentRuntimeModelLabel = currentRuntimeModelPresentation.kind === "pending"
+  const currentRuntimeModelLabel = currentRuntimeConfig.model.kind === "machine"
+    ? formatMessage({ id: "agent.claudeSettings.machine" })
+    : currentRuntimeModelPresentation.kind === "pending"
     ? formatMessage({ id: "common.loading" })
     : currentRuntimeModelPresentation.label;
   const availableRuntimes = agentMachine?.runtimes || [];
@@ -840,7 +842,7 @@ function AgentProfileInfo({ agent, canManageAgent, canChangeAgentRole, onOpenPro
   // made the first provider change in v1 flip the dialog to v2, whose server
   // prefill then discarded that change.
   const runtimeFormV2Flag = useServerFeatureFlag(RUNTIME_FORM_V2_WEB_FLAG_KEY).enabled;
-  const v2EditEligible = runtimeFormV2Flag
+  const v2EditEligible = (runtimeFormV2Flag || draftRuntime === "claude")
     && editingRuntimeConfig
     && showOperationalInfo
     && draftRuntime === agent.runtime
@@ -1262,7 +1264,7 @@ function AgentProfileInfo({ agent, canManageAgent, canChangeAgentRole, onOpenPro
   const draftConnectionGateway = selectedProviderConnection
     ? isBuiltInGatewayProviderMode(selectedProviderConnection.providerId)
     : false;
-  const draftCustomModelInvalid = (draftCustomModelMode || draftBuiltInProviderBaseUrlRequired || draftConnectionGateway) && !draftModel.trim();
+  const draftCustomModelInvalid = !(draftRuntime === "claude" && draftProviderMode === "machine") && (draftCustomModelMode || draftBuiltInProviderBaseUrlRequired || draftConnectionGateway) && !draftModel.trim();
   const draftSchemaSelectedModel = draftSchemaModelSource?.options.find((option) => option.value === draftModel);
   const draftRetainsBuiltInPresetSelection =
     currentRuntimeConfig.runtime === "builtin" &&
@@ -1274,7 +1276,7 @@ function AgentProfileInfo({ agent, canManageAgent, canChangeAgentRole, onOpenPro
   const draftSchemaEffortInvalid = draftSchemaBacked
     && draftReasoningEffort !== null
     && !(draftSchemaSelectedModel?.supportedReasoningEfforts ?? []).includes(draftReasoningEffort);
-  const draftModelSourceInvalid = draftSchemaBacked
+  const draftModelSourceInvalid = draftRuntime === "claude" && draftProviderMode === "machine" ? false : draftSchemaBacked
     ? !draftSchemaSelectedModel || draftSchemaEffortInvalid
     : !runtimeModelSelectionIsRunnable({
         runtime: draftRuntime,
@@ -2022,6 +2024,12 @@ function AgentProfileInfo({ agent, canManageAgent, canChangeAgentRole, onOpenPro
               </InfoRow>
               {!isExternalAgent && agentMachine && (
                 <>
+                  <InfoRow label="Execution host" testId="agent-execution-host">
+                    <span className="font-mono">{agentMachine.hostname || "Host identity pending"} · {agentMachine.os || "OS pending"}</span>
+                  </InfoRow>
+                  <InfoRow label="Machine ID" testId="agent-execution-machine-id">
+                    <span className="break-all font-mono">{agentMachine.id}</span>
+                  </InfoRow>
                   {/* "Computer status", not "Status": the header already shows the agent's own
                       activity, and these are two different things. */}
                   <InfoRow label={formatMessage({ id: "agent.detail.computerStatus" })} testId="agent-computer-connection">
@@ -2219,6 +2227,7 @@ function AgentProfileInfo({ agent, canManageAgent, canChangeAgentRole, onOpenPro
               }}
             >
               <RuntimeConfigFields
+                executionComputer={agentMachine}
                 runtime={draftRuntime}
                 onRuntimeChange={changeDraftRuntime}
                 runtimeOptions={runtimeOptions}

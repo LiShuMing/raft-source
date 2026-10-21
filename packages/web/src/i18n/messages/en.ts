@@ -14,6 +14,16 @@
 // from the foundation, before any real plural/currency copy is migrated.
 
 export const en = {
+  "agent.claudeSettings.target": "Runs on {name}",
+  "agent.claudeSettings.online": "Online",
+  "agent.claudeSettings.offline": "Offline — settings are unavailable",
+  "agent.claudeSettings.machineHint": "Uses this Computer's Claude settings (including ~/.claude/settings.json) and credentials. The model is resolved at launch and has not been verified here. Claude decides precedence when settings conflict.",
+  "agent.claudeSettings.overrideHint": "Uses this Computer's Claude connection and credentials with your selected model.",
+  "agent.claudeSettings.customHint": "Uses the URL, key and model you enter. These credentials are stored by this platform.",
+  "agent.claudeSettings.machine": "Machine settings",
+  "agent.claudeSettings.override": "Override model",
+  "agent.claudeSettings.custom": "Custom connection",
+  "agent.claudeSettings.configuration": "Configuration",
 
   "auth.accountLink.mismatch": "You signed in to a different account than {email}, so {provider} wasn't connected. Please sign in with {email}.",
   "auth.accountLink.providerConflict": "This {provider} account is already connected to another Raft account, so it couldn't be connected here.",
@@ -1477,7 +1487,7 @@ export const en = {
   "agent.runtimeConfig.claudeCommandHint":
     "Executable path or command name; Slock adds the Claude stream-json runtime arguments.",
   "agent.runtimeConfig.providerHint":
-    "Default leaves Claude Code provider settings untouched. Custom sets ANTHROPIC_BASE_URL and ANTHROPIC_API_KEY for this agent.",
+    "Machine settings uses Claude configuration on the selected Computer without passing --model. Override model keeps its connection. Custom connection stores explicit credentials in this platform. Advanced environment variables may override native settings.",
   "agent.runtimeConfig.apiUrl": "API URL",
   "agent.runtimeConfig.apiUrlInvalid": "API URL must start with http:// or https://.",
   "agent.runtimeConfig.apiKey": "API Key",

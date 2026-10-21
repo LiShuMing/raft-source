@@ -210,14 +210,15 @@ const claudeSources: RuntimeFormV2Sources = {
   model: fixture("claude.option-source.fallback.json") as RuntimeFormV2Sources[string],
 };
 
-test("claude: API URL and key show only for a Custom provider and are not submitted under Default", () => {
+test("claude: machine settings is the default; hidden model and credential fields are not submitted", () => {
   const values = initialRuntimeFormV2Values(claude, claudeSources);
-  assert.equal(values.provider, "default");
+  assert.equal(values.provider, "machine");
   assert.equal(values.model, "opus");
-  for (const key of ["apiUrl", "apiKey"]) assert.equal(isRuntimeFormV2FieldVisible(field(claude, key), values, claudeSources), false, key);
+  for (const key of ["apiUrl", "apiKey", "model", "reasoningEffort", "fastMode"]) assert.equal(isRuntimeFormV2FieldVisible(field(claude, key), values, claudeSources), false, key);
   assert.deepEqual(validateRuntimeFormV2(claude, claudeSources, values), {});
   const submitted = runtimeFormV2Submission(claude, { ...values, apiUrl: "https://stale.example.test", apiKey: "stale" }, claudeSources);
   assert.equal("apiUrl" in submitted || "apiKey" in submitted, false);
+  assert.equal("model" in submitted || "fastMode" in submitted || "reasoningEffort" in submitted, false);
 
   const custom = applyRuntimeFormV2Change(claude, claudeSources, values, "provider", "custom");
   for (const key of ["apiUrl", "apiKey"]) assert.equal(isRuntimeFormV2FieldVisible(field(claude, key), custom, claudeSources), true, key);

@@ -44,6 +44,7 @@ import {
   type TraceStatus,
   type Tracer,
   DAEMON_CAPABILITY_SEQUENCED_STATUS,
+  DAEMON_CAPABILITY_CLAUDE_MACHINE_SETTINGS,
   isValidMachineDiskStatus,
   DAEMON_CAPABILITY_RUNTIME_OUTCOME_V1,
   SERVER_CAPABILITY_RUNTIME_OUTCOME_ACK_V1,
@@ -5444,6 +5445,7 @@ export class DaemonCore {
         "agent:deliver",
         "workspace:files",
         DAEMON_CAPABILITY_SEQUENCED_STATUS,
+        DAEMON_CAPABILITY_CLAUDE_MACHINE_SETTINGS,
         // RFC 071: agent:runtime:outcome v1, process spawned/exited, rebind
         // ack processInstanceId, catchupBatchId echo.
         DAEMON_CAPABILITY_RUNTIME_OUTCOME_V1,
