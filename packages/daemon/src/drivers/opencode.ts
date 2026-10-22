@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 import { spawnRuntimeChild } from "./runtimeChild";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
+import { parse as parseJsonc, type ParseError } from "jsonc-parser";
 import path from "node:path";
 import { formatRuntimeProviderModelLabel, hydrateRuntimeConfig, runtimeConfigToLaunchFields, runtimeModelSourceOutcomeFromSet, type AgentConfig, type AgentMessage, type RuntimeModelInfo, type RuntimeModelSet, type RuntimeModelSourceOutcome , type AxSurfaceText } from "@botiverse/raft-shared";
 import { buildCliTransportSystemPrompt, prepareCliTransport } from "./cliTransport";
@@ -80,7 +81,9 @@ export interface OpenCodeSpawnSpec {
 function parseOpenCodeConfigContent(raw: string | null | undefined): Record<string, unknown> {
   if (!raw) return {};
   try {
-    const parsed = JSON.parse(raw);
+    const errors: ParseError[] = [];
+    const parsed = parseJsonc(raw, errors, { allowTrailingComma: true });
+    if (errors.length) return {};
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
       return parsed as Record<string, unknown>;
     }
@@ -95,14 +98,26 @@ function parseUserOpenCodeConfig(ctx: SpawnContext): Record<string, unknown> {
   return parseOpenCodeConfigContent(raw);
 }
 
-function readLocalOpenCodeConfig(home: string = os.homedir()): Record<string, unknown> {
-  const configPath = path.join(home, ".config", "opencode", "opencode.json");
-  try {
-    return parseOpenCodeConfigContent(readFileSync(configPath, "utf8"));
-  } catch {
-    // Missing or invalid local OpenCode config is not fatal.
+function readLocalOpenCodeConfig(home: string, env: NodeJS.ProcessEnv): Record<string, unknown> {
+  const configHome = env.XDG_CONFIG_HOME || path.join(home, ".config");
+  const files = [
+    ...["config.json", "opencode.json", "opencode.jsonc"].map((name) => path.join(configHome, "opencode", name)),
+    ...(env.OPENCODE_CONFIG ? [env.OPENCODE_CONFIG] : []),
+    ...(env.OPENCODE_CONFIG_DIR
+      ? ["opencode.json", "opencode.jsonc"].map((name) => path.join(env.OPENCODE_CONFIG_DIR!, name))
+      : []),
+  ];
+  let config: Record<string, unknown> = {};
+  for (const file of files) {
+    try {
+      config = mergeOpenCodeConfigs(config, parseOpenCodeConfigContent(readFileSync(file, "utf8")));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw new Error("Cannot read a configured OpenCode config file.");
+      }
+    }
   }
-  return {};
+  return config;
 }
 
 function recordField(value: unknown): Record<string, unknown> {
@@ -352,22 +367,15 @@ function mergeOpenCodeConfigs(
   localConfig: Record<string, unknown>,
   envConfig: Record<string, unknown>,
 ): Record<string, unknown> {
-  return {
-    ...localConfig,
-    ...envConfig,
-    provider: {
-      ...recordField(localConfig.provider),
-      ...recordField(envConfig.provider),
-    },
-    agent: {
-      ...recordField(localConfig.agent),
-      ...recordField(envConfig.agent),
-    },
-    mcp: {
-      ...recordField(localConfig.mcp),
-      ...recordField(envConfig.mcp),
-    },
-  };
+  const merged = { ...localConfig };
+  for (const [key, value] of Object.entries(envConfig)) {
+    const left = localConfig[key];
+    merged[key] = value && typeof value === "object" && !Array.isArray(value)
+      && left && typeof left === "object" && !Array.isArray(left)
+      ? mergeOpenCodeConfigs(recordField(left), recordField(value))
+      : value;
+  }
+  return merged;
 }
 
 export function buildOpenCodeConfig(
@@ -375,7 +383,9 @@ export function buildOpenCodeConfig(
   home: string = os.homedir(),
   managedMcp?: { name: string; url: string } | null,
 ): Record<string, unknown> {
-  const userConfig = mergeOpenCodeConfigs(readLocalOpenCodeConfig(home), parseUserOpenCodeConfig(ctx));
+  const env = { ...ambientProcessEnv(), ...runtimeConfigToLaunchFields(hydrateRuntimeConfig(ctx.config)).envVars };
+  const hostConfig = mergeOpenCodeConfigs(readLocalOpenCodeConfig(home, env), parseOpenCodeConfigContent(env.OPENCODE_CONFIG_CONTENT));
+  const userConfig = mergeOpenCodeConfigs(hostConfig, parseUserOpenCodeConfig(ctx));
   const userAgents = recordField(userConfig.agent);
   const userSlockAgent = recordField(userAgents[SLOCK_AGENT_NAME]);
   return {

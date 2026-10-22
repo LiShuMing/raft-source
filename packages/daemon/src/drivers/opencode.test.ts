@@ -1378,3 +1378,29 @@ test("task #1277 (launch): an opencode launch cancelled while the lookup runs cr
     }
   });
 });
+
+test("OpenCode loads JSONC and merges explicit host paths without losing nested provider options", () => {
+  withTempDir((root) => {
+    const xdg = path.join(root, "xdg");
+    const extra = path.join(root, "extra");
+    mkdirSync(path.join(xdg, "opencode"), { recursive: true });
+    mkdirSync(extra);
+    writeFileSync(path.join(xdg, "opencode", "opencode.jsonc"), `{
+      // Native host configuration, with a URL and trailing commas.
+      "provider": { "local": { "options": { "baseURL": "https://example.test/v1", "apiKey": "fixture" }, } },
+      "model": "local/test",
+    }`);
+    const explicit = path.join(root, "custom.jsonc");
+    writeFileSync(explicit, '{"provider":{"local":{"options":{"timeout":123}}}}');
+    writeFileSync(path.join(extra, "opencode.jsonc"), '{"provider":{"local":{"options":{"retries":2}}}}');
+    const config = buildOpenCodeConfig(makeSpawnContext(root, null, {
+      XDG_CONFIG_HOME: xdg, OPENCODE_CONFIG: explicit, OPENCODE_CONFIG_DIR: extra,
+      OPENCODE_CONFIG_CONTENT: '{"provider":{"local":{"options":{"apiKey":"agent-override"}}}}',
+    }), root) as any;
+    assert.deepEqual(config.provider.local.options, {
+      baseURL: "https://example.test/v1", apiKey: "agent-override", timeout: 123, retries: 2,
+    });
+    assert.equal(config.model, "local/test");
+    assert.equal(config.agent.slock.prompt, "standing");
+  });
+});

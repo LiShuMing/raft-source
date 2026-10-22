@@ -57,6 +57,7 @@
     "ajv": "^8.20.0",
     "commander": "^12.1.0",
     "https-proxy-agent": "^7.0.6",
+    "jsonc-parser": "^3.3.1",
     "proper-lockfile": "^4.1.2",
     "safe-regex2": "5.1.1",
     "tar-stream": "2.2.0",

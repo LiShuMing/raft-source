@@ -188,6 +188,28 @@ and never silently use the public Raft API. Native models and tools retain their
 existing network authority, as described below. Multi-center replicas, shared
 PGlite directories and transparent native-session failover are not enabled.
 
+## Native Pi and OpenCode configuration
+
+Pi uses the bundled SDK and reads the execution user's `~/.pi/agent/` state
+(or `PI_CODING_AGENT_DIR`, including `~/` paths). For local launchers that use
+`PI_ENV_FILE`, the runner also reads that dotenv file, defaulting to `~/.env`.
+It parses values without sourcing shell code. Existing process/agent environment
+values win; shell commands and shell variable expansion in dotenv files are not
+executed. Explicit Raft model selection wins over native defaults. Otherwise Pi
+settings retain precedence, followed by an unambiguous `LLM_MODEL` entry in the
+local models configuration. The model catalog alone must not choose another
+provider with the same model name. Unspecified thinking uses Pi's own settings.
+Provider environment values remain session-local at request time. This behavior
+applies to the native Pi runtime, not the isolated Built-in runtime.
+
+OpenCode reads `config.json`, `opencode.json` and `opencode.jsonc` under
+`$XDG_CONFIG_HOME/opencode` (default `~/.config/opencode`), then explicit
+`OPENCODE_CONFIG` and `OPENCODE_CONFIG_DIR` files, and finally inline
+`OPENCODE_CONFIG_CONTENT`. JSONC comments/trailing commas and nested provider
+options are preserved. Raft still owns its standing prompt and keeps the existing
+OpenCode 2.x project/plugin isolation; this does not enable arbitrary project
+configuration or plugins. Native authentication data stays on the execution host.
+
 ## Privacy defaults
 
 Standalone now applies an application privacy policy in addition to local

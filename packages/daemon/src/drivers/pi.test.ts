@@ -4685,3 +4685,44 @@ test("task #17: Pi tool ends carry the call id, Pi's own duration, and a non-zer
   assert.deepEqual(end({ isError: true, durationMs: 900, result: { structuredContent: { exit_code: 1, output: "" } } }), [{ kind: "tool_output", name: "bash", callId: "call-7", ok: true, exitCode: 1, durationMs: 900 }]);
   assert.deepEqual(end({ isError: true, result: { content: [{ type: "text", text: "Command timed out" }] } }), [{ kind: "tool_output", name: "bash", callId: "call-7", ok: false }]);
 });
+
+test("Pi native dotenv model and request credentials survive session-create env restoration", async () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "pi-native-dotenv-"));
+  const agentDir = path.join(root, "agent");
+  const workspace = path.join(root, "workspace");
+  mkdirSync(agentDir); mkdirSync(workspace);
+  const envFile = path.join(root, "native.env");
+  writeFileSync(envFile, 'RAFT_TEST_NATIVE_KEY=fixture-native-key\nLLM_MODEL=gpt-5\n');
+  let authorization: string | undefined;
+  const server = createServer((req, res) => {
+    authorization = req.headers.authorization;
+    req.resume();
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ id: "fixture", object: "chat.completion", created: 1,
+      model: "gpt-5", choices: [{ index: 0, message: { role: "assistant", content: "ok" }, finish_reason: "stop" }],
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } }));
+  });
+  const port = await listenOnLoopback(server);
+  writeFileSync(path.join(agentDir, "models.json"), JSON.stringify({ providers: {
+    "native-only-provider": { api: "openai-completions", baseUrl: `http://127.0.0.1:${port}/v1`,
+      apiKey: "$RAFT_TEST_NATIVE_KEY", models: [{ id: "gpt-5", reasoning: true }] },
+  } }));
+  writeFileSync(path.join(agentDir, "settings.json"), JSON.stringify({ defaultThinkingLevel: "high" }));
+  let session: AgentSession | undefined;
+  try {
+    session = await createPiAgentSessionForContext(makeSpawnContext({
+      envVars: { PI_ENV_FILE: envFile, PI_CODING_AGENT_DIR: agentDir },
+    }, { workingDirectory: workspace }), "native-dotenv-proof");
+    assert.equal(process.env.RAFT_TEST_NATIVE_KEY, undefined);
+    assert.equal(session.model?.provider, "native-only-provider");
+    assert.equal(session.thinkingLevel, "high");
+    await session.modelRuntime.streamSimple(session.model!, {
+      messages: [{ role: "user", content: "fixture", timestamp: Date.now() }],
+    }).result();
+    assert.equal(authorization, "Bearer fixture-native-key");
+  } finally {
+    session?.dispose();
+    await closeServer(server);
+    rmSync(root, { recursive: true, force: true });
+  }
+});

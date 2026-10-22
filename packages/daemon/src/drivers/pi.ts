@@ -1,3 +1,5 @@
+import { ambientProcessEnv } from "../processEnvPatch";
+import { readPiHostEnv, resolvePiAgentDir, piHostDefaultModel } from "./piHostConfig";
 import { RuntimeModelNotFoundError } from "../spawnFailureErrors";
 import { withProcessEnvPatch } from "../processEnvPatch";
 import type { ProviderRequestObserver } from "../providerRequestFetch";
@@ -835,11 +837,13 @@ export async function detectPiModels(
     return detectPiModelsFromRegistry(modelRegistry);
   }
 
-  const agentDir = getAgentDir();
-  const services = await createAgentSessionServices({
+  const env = ambientProcessEnv();
+  const hostEnv = readPiHostEnv(env);
+  const agentDir = resolvePiAgentDir({ ...hostEnv, ...env }, getAgentDir());
+  const services = await withProcessEnvPatch(hostEnv, () => createAgentSessionServices({
     cwd: process.cwd(),
     agentDir,
-  });
+  }));
   const detectedModelRegistry = new ModelRegistry(services.modelRuntime);
   logPiServiceDiagnostics("detect_models", services);
   addPiServiceTraceEvent(traceContext.span, "daemon.pi.models.services_ready", services);
@@ -1442,6 +1446,7 @@ function installProviderHttpClient(
   modelRuntime: ModelRuntime,
   providerHttpClient: ProviderHttpClient,
   customEndpoint: boolean,
+  nativeEnv?: Record<string, string>,
 ): void {
   const fetchForModel = (model: Parameters<ModelRuntime["stream"]>[0]) => {
     const prefix = model.id.split("/")[0];
@@ -1453,6 +1458,7 @@ function installProviderHttpClient(
   modelRuntime.stream = ((model, context, options) => {
     const providerOptions = {
       ...options,
+      ...(nativeEnv ? { env: { ...nativeEnv, ...options?.env } } : {}),
       fetch: fetchForModel(model),
     } as typeof options;
     return stream(model, context, providerOptions);
@@ -1461,6 +1467,7 @@ function installProviderHttpClient(
   const streamSimple = modelRuntime.streamSimple.bind(modelRuntime);
   modelRuntime.streamSimple = ((model, context, options) => streamSimple(model, context, {
     ...options,
+    ...(nativeEnv ? { env: { ...nativeEnv, ...options?.env } } : {}),
     fetch: fetchForModel(model),
   })) as ModelRuntime["streamSimple"];
 }
@@ -1552,7 +1559,8 @@ export async function createPiAgentSessionForContext(
 
   try {
     const spawnEnv = await buildPiSpawnEnv(ctx);
-    const agentDir = opts.agentDir ?? spawnEnv.PI_CODING_AGENT_DIR ?? getAgentDir();
+    const hostEnv = runtimeConfig.runtime === "pi" ? readPiHostEnv(spawnEnv) : {};
+    const agentDir = opts.agentDir ?? resolvePiAgentDir({ ...hostEnv, ...spawnEnv }, getAgentDir());
     mkdirSync(agentDir, { recursive: true });
     const settingsManager = SettingsManager.create(ctx.workingDirectory, agentDir);
     // Resolve only enabled host extensions. Keep host auth, models and other
@@ -1570,7 +1578,7 @@ export async function createPiAgentSessionForContext(
       localExtensionPaths = resources.extensions.filter((entry) => entry.enabled).map((entry) => entry.path);
     }
     const providerEnvScope = opts.isolateHostProviderEnv ? BUILTIN_BLOCKED_HOST_PROVIDER_ENV_KEYS : undefined;
-    const sessionCreateEnvPatch = buildPiSessionCreateEnvPatch(runtimeConfig, launchRuntimeFields.envVars);
+    const sessionCreateEnvPatch = buildPiSessionCreateEnvPatch(runtimeConfig, { ...hostEnv, ...launchRuntimeFields.envVars });
     const sessionServices = await withProcessEnvPatch(sessionCreateEnvPatch, async () => {
       const sessionProviderHttpClient = createProviderHttpClient(
         process.env,
@@ -1585,7 +1593,8 @@ export async function createPiAgentSessionForContext(
         });
         installProviderHttpClient(modelRuntime, sessionProviderHttpClient,
           runtimeConfig.runtime === "builtin" && (runtimeConfig.provider.kind === "gateway"
-            || (runtimeConfig.provider.kind === "connection" && Boolean(managedProviderConnection?.endpointUrl))));
+            || (runtimeConfig.provider.kind === "connection" && Boolean(managedProviderConnection?.endpointUrl))),
+          runtimeConfig.runtime === "pi" ? { ...hostEnv, ...launchRuntimeFields.envVars } : undefined);
         // Request-time credentials and proxy routing must be session-local.
         // Holding a process.env patch across an async SDK turn serializes every
         // Pi agent in this runner. The short create-time scope also keeps
@@ -1627,7 +1636,9 @@ export async function createPiAgentSessionForContext(
       ...launchTraceEvidenceAttrs,
     });
     const model = resolvePiModelFromRegistry(
-      launchRuntimeFields.model,
+      runtimeConfig.runtime === "pi"
+        ? piHostDefaultModel(launchRuntimeFields.model, { ...hostEnv, ...spawnEnv }, services.settingsManager, modelRegistry.getAll(), path.join(agentDir, "models.json"))
+        : launchRuntimeFields.model,
       modelRegistry,
       runtimeConfig,
       managedProviderConnection,
@@ -1741,7 +1752,9 @@ export async function createPiAgentSessionForContext(
         services,
         sessionManager,
         model,
-        thinkingLevel: resolveBuiltInThinkingLevel(launchRuntimeFields.reasoningEffort, gatewayRegistration.thinkingContract),
+        thinkingLevel: runtimeConfig.runtime === "pi" && !launchRuntimeFields.reasoningEffort
+          ? undefined
+          : resolveBuiltInThinkingLevel(launchRuntimeFields.reasoningEffort, gatewayRegistration.thinkingContract),
         customTools: [
           createPiCommandTool(ctx.workingDirectory, toolSpawnEnv, {
             observer: toolExecutionObserver,
