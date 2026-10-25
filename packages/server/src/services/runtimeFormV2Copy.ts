@@ -39,6 +39,8 @@ const ZH_CN: Readonly<Record<string, string>> = Object.freeze({
   "Available values depend on the selected model.": "可选值取决于所选模型。",
   "Built-in Pi is ready to use without local runtime setup. It uses the provider key entered here.":
     "内置 Pi 无需本地运行时设置即可使用。它会使用这里填写的提供方密钥。",
+  "Configured automatically uses this computer's Pi default model and credentials. Other providers require their own API key.":
+    "已配置会自动使用这台计算机的 Pi 默认模型和凭证，无需选择模型。其他提供商需要单独填写 API Key。",
   "Configured uses your machine's Pi auth.json. Other options inject the matching API key as an env var so the Pi SDK picks it up — no auth.json edit on your machine.":
     "已配置模式会使用你机器上的 Pi auth.json。其他选项会把对应 API 密钥注入为环境变量，让 Pi SDK 自动读取——无需修改机器上的 auth.json。",
   "Default leaves Claude Code provider settings untouched. Custom sets ANTHROPIC_BASE_URL and ANTHROPIC_API_KEY for this agent.":

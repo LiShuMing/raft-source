@@ -265,7 +265,7 @@ test("built-in provider default model follows Pi SDK default, not display order"
   assert.equal(piBuiltinProviderDefaultModel("unknown-provider"), null);
 });
 
-test("buildRuntimeConfig maps Pi configured provider model selections into structured config", () => {
+test("buildRuntimeConfig delegates Pi configured model selections to the host into structured config", () => {
   const config = buildRuntimeConfig({
     runtime: "pi",
     model: "openrouter/openai/gpt-5.4",
@@ -282,9 +282,9 @@ test("buildRuntimeConfig maps Pi configured provider model selections into struc
     version: 1,
     runtime: "pi",
     provider: { kind: "default" },
-    model: { kind: "preset", id: "openrouter/openai/gpt-5.4" },
+    model: { kind: "preset", id: "default" },
     mode: { kind: "default" },
-    reasoningEffort: "medium",
+    reasoningEffort: null,
     envVars: null,
   });
 });
@@ -498,4 +498,23 @@ test("the credential term alone disables save", () => {
 test("an unchanged draft disables save even when nothing is invalid", () => {
   // Named explicitly so a future red here is not misread as the credential term.
   assert.equal(isRuntimeConfigSaveDisabled({ ...SAVEABLE, changed: false }), true);
+});
+
+test("Pi Configured ignores stale manual model and reasoning when saving host defaults", () => {
+  const config = buildRuntimeConfig({
+    runtime: "pi", model: "anthropic/claude-fable-5", customModelMode: true,
+    customModelName: "stale/model", piProviderMode: "configured",
+    reasoningEffort: "high", envVars: { LLM_MODEL: "host-model" },
+  });
+  assert.deepEqual(config.model, { kind: "preset", id: "default" });
+  assert.equal(config.reasoningEffort, null);
+  assert.deepEqual(config.provider, { kind: "default" });
+  assert.deepEqual(config.envVars, { LLM_MODEL: "host-model" });
+});
+
+test("OpenCode saves host defaults despite stale model and reasoning", () => {
+  const config = buildRuntimeConfig({ runtime: "opencode", model: "old/model", customModelMode: true, customModelName: "old/custom", reasoningEffort: "high", envVars: { KEEP: "1" } });
+  assert.deepEqual(config.model, { kind: "preset", id: "default" });
+  assert.equal(config.reasoningEffort, null);
+  assert.deepEqual(config.envVars, { KEEP: "1" });
 });

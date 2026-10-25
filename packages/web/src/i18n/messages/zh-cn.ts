@@ -1525,8 +1525,7 @@ export const zhCn: Record<MessageId, string> = {
   "agent.runtimeConfig.builtInRequiredHint": "必填——{runtimeName} 需要提供方和 API 密钥才能运行。",
   "agent.runtimeConfig.apiKeyRequiredForProvider": "{provider} 需要 API 密钥。",
   "agent.runtimeConfig.imageInputHint": "仅当此 gateway endpoint 和模型接受图片时开启。",
-  "agent.runtimeConfig.piProviderHint":
-    "已配置模式会使用你机器上的 Pi auth.json。其他选项会把对应 API 密钥注入为环境变量，让 Pi SDK 自动读取——无需修改机器上的 auth.json。",
+  "agent.runtimeConfig.piProviderHint": "已配置会自动使用这台计算机的 Pi 默认模型和凭证，无需选择模型。其他提供商需要单独填写 API Key。",
   "agent.runtimeConfig.apiKeyRequiredForBuiltInProvider": "选择内置提供方时需要 API 密钥。",
   "agent.runtimeConfig.customModelName": "自定义模型名称",
   "agent.runtimeConfig.customModelId": "自定义模型 ID",

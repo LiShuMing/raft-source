@@ -1539,8 +1539,7 @@ export const en = {
   "agent.runtimeConfig.builtInRequiredHint": "Required — {runtimeName} needs a provider and API key to run.",
   "agent.runtimeConfig.apiKeyRequiredForProvider": "API Key is required for {provider}.",
   "agent.runtimeConfig.imageInputHint": "Enable only when this gateway endpoint and model accept images.",
-  "agent.runtimeConfig.piProviderHint":
-    "Configured uses your machine's Pi auth.json. Other options inject the matching API key as an env var so the Pi SDK picks it up — no auth.json edit on your machine.",
+  "agent.runtimeConfig.piProviderHint": "Configured automatically uses this computer's Pi default model and credentials. Other providers require their own API key.",
   "agent.runtimeConfig.apiKeyRequiredForBuiltInProvider": "API Key is required when a built-in provider is selected.",
   "agent.runtimeConfig.customModelName": "Custom model name",
   "agent.runtimeConfig.customModelId": "Custom model ID",

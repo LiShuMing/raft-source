@@ -796,6 +796,7 @@ export default function RuntimeConfigFields({
   const effectiveEnvVarsHint = envVarsHint ?? formatMessage({ id: "agent.runtimeConfig.envVarsHint" });
   const apiUrlSupported = supportsRuntimeApiUrl(runtime);
   const claudeMachineSettings = runtime === "claude" && providerMode === "machine";
+  const piMachineSettings = runtime === "pi" && piProviderMode === PI_PROVIDER_CONFIGURED;
   const commandSupported = supportsRuntimeCommand(runtime);
   const customModelSupported = supportsRuntimeCustomModelName(runtime);
   const fastModeSupported = supportsRuntimeFastMode(runtime);
@@ -1114,7 +1115,7 @@ export default function RuntimeConfigFields({
   // The genuinely technical knobs. These are what "Advanced" is for.
   const technicalFields = (
     <>
-      {!claudeMachineSettings && reasoningField}
+      {!claudeMachineSettings && !piMachineSettings && reasoningField}
       {!claudeMachineSettings && fastModeField}
     </>
   );
@@ -1378,7 +1379,7 @@ export default function RuntimeConfigFields({
       {/* Dynamic required per cindyz: only the modes that actually enforce a model
           value carry the marker. A static asterisk would claim the select can be
           left empty, which it cannot. */}
-      {!claudeMachineSettings && <Field
+      {!claudeMachineSettings && !piMachineSettings && runtime !== "opencode" && <Field
         label={formatMessage({ id: "agent.runtimeConfig.model" })}
         required={customModelInputMode}
         // Was a conditional `<p>` in `belowControl`; moved to the slot for the

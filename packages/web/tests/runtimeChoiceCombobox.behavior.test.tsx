@@ -142,3 +142,116 @@ test("the runtime form's model field: a listed pick clears custom mode, a typed 
   fireEvent.click(screen.getByTestId("runtime-model-combobox-use-custom"));
   assert.deepEqual(calls, ["custom:false", "model:sonnet", "custom:true", "model:claude-next-preview"]);
 });
+
+
+test("Pi Configured has no model chooser; a manual provider still does", async () => {
+  const { default: RuntimeConfigFields } = await import("../src/components/agent/RuntimeConfigFields");
+  render(
+    <TestIntlProvider locale="en">
+      <RuntimeConfigFields
+        runtime="pi"
+        onRuntimeChange={() => undefined}
+        runtimeOptions={[{ value: "claude", label: "Claude Code" }]}
+        model="opus"
+        onModelChange={() => undefined}
+        customModelMode={false}
+        onCustomModelModeChange={() => undefined}
+        modelOptions={[{ value: "opus", label: "Claude Opus" }, { value: "sonnet", label: "Claude Sonnet" }]}
+        runtimeModels={{ source: { kind: "unsupported" }, models: [], loading: false, rescan: () => undefined }}
+        providerMode="default"
+        onProviderModeChange={() => undefined}
+        providerApiUrl=""
+        onProviderApiUrlChange={() => undefined}
+        providerApiKey=""
+        onProviderApiKeyChange={() => undefined}
+        builtInProviderMode="deepseek"
+        onBuiltInProviderModeChange={() => undefined}
+        piProviderMode="configured"
+        onPiProviderModeChange={() => undefined}
+        piProviderApiKey=""
+        onPiProviderApiKeyChange={() => undefined}
+        reasoningEffort={null}
+        onReasoningEffortChange={() => undefined}
+        command=""
+        onCommandChange={() => undefined}
+        envVarEntries={[]}
+        onEnvVarEntriesChange={() => undefined}
+      />
+    </TestIntlProvider>,
+  );
+  assert.equal(screen.queryByTestId("runtime-model-combobox"), null);
+  cleanup();
+  render(
+    <TestIntlProvider locale="en">
+      <RuntimeConfigFields
+        runtime="pi"
+        onRuntimeChange={() => undefined}
+        runtimeOptions={[{ value: "claude", label: "Claude Code" }]}
+        model="opus"
+        onModelChange={() => undefined}
+        customModelMode={false}
+        onCustomModelModeChange={() => undefined}
+        modelOptions={[{ value: "opus", label: "Claude Opus" }, { value: "sonnet", label: "Claude Sonnet" }]}
+        runtimeModels={{ source: { kind: "unsupported" }, models: [], loading: false, rescan: () => undefined }}
+        providerMode="default"
+        onProviderModeChange={() => undefined}
+        providerApiUrl=""
+        onProviderApiUrlChange={() => undefined}
+        providerApiKey=""
+        onProviderApiKeyChange={() => undefined}
+        builtInProviderMode="deepseek"
+        onBuiltInProviderModeChange={() => undefined}
+        piProviderMode="deepseek"
+        onPiProviderModeChange={() => undefined}
+        piProviderApiKey=""
+        onPiProviderApiKeyChange={() => undefined}
+        reasoningEffort={null}
+        onReasoningEffortChange={() => undefined}
+        command=""
+        onCommandChange={() => undefined}
+        envVarEntries={[]}
+        onEnvVarEntriesChange={() => undefined}
+      />
+    </TestIntlProvider>,
+  );
+  assert.ok(screen.getByTestId("runtime-model-combobox"));
+});
+
+test("OpenCode uses the host default without a model chooser", async () => {
+  const { default: RuntimeConfigFields } = await import("../src/components/agent/RuntimeConfigFields");
+  render(
+    <TestIntlProvider locale="en">
+      <RuntimeConfigFields
+        runtime="opencode"
+        onRuntimeChange={() => undefined}
+        runtimeOptions={[{ value: "claude", label: "Claude Code" }]}
+        model="opus"
+        onModelChange={() => undefined}
+        customModelMode={false}
+        onCustomModelModeChange={() => undefined}
+        modelOptions={[{ value: "opus", label: "Claude Opus" }, { value: "sonnet", label: "Claude Sonnet" }]}
+        runtimeModels={{ source: { kind: "unsupported" }, models: [], loading: false, rescan: () => undefined }}
+        providerMode="default"
+        onProviderModeChange={() => undefined}
+        providerApiUrl=""
+        onProviderApiUrlChange={() => undefined}
+        providerApiKey=""
+        onProviderApiKeyChange={() => undefined}
+        builtInProviderMode="deepseek"
+        onBuiltInProviderModeChange={() => undefined}
+        piProviderMode="configured"
+        onPiProviderModeChange={() => undefined}
+        piProviderApiKey=""
+        onPiProviderApiKeyChange={() => undefined}
+        reasoningEffort={null}
+        onReasoningEffortChange={() => undefined}
+        command=""
+        onCommandChange={() => undefined}
+        envVarEntries={[]}
+        onEnvVarEntriesChange={() => undefined}
+      />
+    </TestIntlProvider>,
+  );
+  assert.equal(screen.queryByTestId("runtime-model-combobox"), null);
+
+});

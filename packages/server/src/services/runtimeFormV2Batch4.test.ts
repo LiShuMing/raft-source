@@ -22,11 +22,9 @@ import {
   type RuntimeFormV2OptionSource,
 } from "@botiverse/raft-runtime-form";
 import {
-  BASE_REASONING_EFFORTS,
   parseRuntimeConfig,
   REASONING_EFFORT_RUNTIMES,
   RUNTIME_FAST_MODE_RUNTIMES,
-  RUNTIME_MODELS,
   type ReasoningEffort,
   type RuntimeConfig,
   type RuntimeModelInfo,
@@ -59,7 +57,6 @@ import {
   runtimeFormValuesFromRuntimeConfig,
   type RuntimeFormOptionSourceContext,
 } from "./runtimeFormV2Registry";
-import { RUNTIME_FORM_V2_REASON_RETRYABLE } from "./runtimeFormV2SourceStatus";
 
 const wire = (value: unknown) => JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
 const piForm = () => parseRuntimeFormV2(wire(buildRuntimeFormV2("pi")))!;
@@ -83,7 +80,7 @@ test("pi form: fields by kind, in order, each model/effort pair shown for its pr
   // A v2-only form: the v1 routes and the admission row's v1 ref never see it.
   assert.equal(runtimeFormV1Entry("pi"), null);
   const builtIn = { key: "provider", in: [...PI_BUILTIN_PROVIDER_IDS] };
-  const configured = { key: "provider", in: [PI_PROVIDER_CONFIGURED] };
+  const configured = { key: "provider", in: [] };
   const visibility = Object.fromEntries(parsed.fields.map((field) => [field.key, field.visibleWhen]));
   assert.deepEqual(visibility, {
     provider: [],
@@ -210,36 +207,15 @@ const LIVE: RuntimeModelInfo[] = [
   { id: "deepseek/deepseek-v4-pro", label: "DeepSeek V4 Pro · DeepSeek", verified: "launchable" },
 ];
 
-test("the Configured model source: the Pi probe's list when live, else the bundled list with the table's reason", async () => {
-  const live = await resolved("model", async () => ({ kind: "live", value: { models: LIVE, default: LIVE[1]!.id } }));
-  assert.deepEqual(live.calls, ["route", "pi"]);
-  assert.equal(live.source.status, "live");
-  assert.equal("reason" in live.source, false);
-  assert.equal("retryable" in live.source, false);
-  assert.equal(live.source.customValueAllowed, true);
-  assert.equal(live.source.defaultValue, LIVE[1]!.id);
-  assert.deepEqual((live.source.options as Array<{ value: string }>).map((option) => option.value), LIVE.map((model) => model.id));
-  // Efforts as the legacy picker offers them for Pi: the BASE set for every model.
-  for (const option of live.source.options as Array<{ value: string; supportedReasoningEfforts: string[]; defaultReasoningEffort?: string }>) {
-    assert.deepEqual(option.supportedReasoningEfforts, reasoningEffortOptionsForModel("pi", option.value, LIVE).map((effort) => effort.value));
-    assert.deepEqual(option.supportedReasoningEfforts, [...BASE_REASONING_EFFORTS]);
-    assert.equal("defaultReasoningEffort" in option, false);
+test("Configured model source is automatic and never waits on the computer's model probe", async () => {
+  for (const [, detect, , , routing] of NON_LIVE_CASES) {
+    const { source, calls } = await resolved("model", detect, routing);
+    assert.deepEqual(calls, []);
+    assert.deepEqual(source.options, [{ value: "default", label: "Configured Default / Auto" }]);
+    assert.equal(source.defaultValue, "default");
+    assert.equal(source.customValueAllowed, false);
   }
-
-  for (const [label, detect, reason, retryable, routing] of NON_LIVE_CASES) {
-    const { source } = await resolved("model", detect, routing);
-    assert.equal(source.status, "fallback", label);
-    assert.equal(source.reason, reason, label);
-    assert.equal(source.retryable, retryable, label);
-    assert.equal(source.retryable, RUNTIME_FORM_V2_REASON_RETRYABLE[reason as keyof typeof RUNTIME_FORM_V2_REASON_RETRYABLE], label);
-    assert.equal(source.customValueAllowed, true, label);
-    assert.deepEqual((source.options as Array<{ value: string }>).map((option) => option.value), RUNTIME_MODELS.pi!.map((model) => model.id), label);
-    assert.equal(source.defaultValue, "default", label);
-  }
-  const replayed = await runtimeFormV2Entry("pi")!.resolveOptionSource(sourceContext(neverProbe, "handled").context);
-  assert.deepEqual(replayed, { kind: "handled" });
   const unknown = await resolved("nope", neverProbe);
-  assert.deepEqual(unknown.calls, []);
   assert.equal(unknown.source, null);
 });
 
@@ -259,14 +235,14 @@ test("client state: switching to a built-in provider shows its key, list and def
   const field = (key: string) => form.fields.find((candidate) => candidate.key === key)!;
   let values = initialRuntimeFormV2Values(form, sources);
   assert.equal(values.provider, "configured");
-  assert.equal(values.model, LIVE[0]!.id);
+  assert.equal(values.model, "default");
   const shown = () => form.fields.filter((candidate) => isRuntimeFormV2FieldVisible(candidate, values, sources)).map((candidate) => candidate.key);
-  assert.deepEqual(shown(), ["provider", "model", "reasoningEffort", "envVars"]);
+  assert.deepEqual(shown(), ["provider", "envVars"]);
   assert.deepEqual(runtimeFormV2Choices(field("model"), sources, values), {
     kind: "select",
     options: (sources.model!.options ?? []).map((option) => ({ ...option })),
     allowEmpty: false,
-    allowCustom: true,
+    allowCustom: false,
   });
 
   values = applyRuntimeFormV2Change(form, sources, values, "provider", "deepseek");
@@ -284,7 +260,7 @@ test("client state: switching to a built-in provider shows its key, list and def
   const effortChoices = runtimeFormV2Choices(field("reasoningEffort"), sources, values);
   assert.deepEqual(effortChoices?.kind === "select" ? effortChoices.options : null, [], "no effort menu for a typed custom model");
   assert.deepEqual(validateRuntimeFormV2(form, sources, values), {});
-  assert.deepEqual(runtimeFormV2Submission(form, values, sources), { provider: "configured", model: "my-org/typed", reasoningEffort: null, envVars: {} });
+  assert.deepEqual(runtimeFormV2Submission(form, values, sources), { provider: "configured", envVars: {} });
 });
 
 // ── Submit: the legacy runtimeConfig ──
@@ -345,12 +321,12 @@ test("submit errors point at the field the user sees", () => {
   for (const provider of [undefined, "", "default", "pi-builtin", "openai-compatible", 1]) {
     assert.deepEqual(issue({ provider, model: "default" }), { code: "select_valid_provider", pointer: "/formValues/provider" }, String(provider));
   }
-  assert.deepEqual(issue({ provider: "configured", model: " " }), { code: "model_required", pointer: "/formValues/model" });
+  assert.equal(issue({ provider: "configured" }), null, "host defaults need no model selection");
   assert.deepEqual(issue({ provider: "deepseek", apiKey: "k", providerModel: "" }), { code: "model_required", pointer: "/formValues/providerModel" });
   assert.deepEqual(issue({ provider: "deepseek", apiKey: "k", providerModel: "my-org/typed" }), { code: "select_valid_provider_model", pointer: "/formValues/providerModel" });
   assert.deepEqual(issue({ provider: "deepseek", apiKey: " ", providerModel: "deepseek/deepseek-v4-pro" }), { code: "api_key_required", pointer: "/formValues/apiKey" });
-  assert.deepEqual(issue({ provider: "configured", model: "default", reasoningEffort: "turbo" }), { code: "invalid_reasoning_effort", pointer: "/formValues/reasoningEffort" });
-  assert.deepEqual(issue({ provider: "configured", model: "default", reasoningEffort: 3 }), { code: "invalid_reasoning_effort", pointer: "/formValues/reasoningEffort" });
+  assert.equal(issue({ provider: "configured", model: "stale", reasoningEffort: "turbo" }), null, "hidden values cannot override host defaults");
+  assert.equal(issue({ provider: "configured", model: "default", reasoningEffort: 3 }), null);
   assert.deepEqual(
     issue({ provider: "deepseek", apiKey: "k", providerModel: "deepseek/deepseek-v4-pro", providerReasoningEffort: "turbo" }),
     { code: "invalid_reasoning_effort", pointer: "/formValues/providerReasoningEffort" },
@@ -380,7 +356,7 @@ test("edit values round-trip the stored config; the API key is never part of the
   assert.deepEqual(runtimeFormValuesFromRuntimeConfig(stored[0]!), {
     provider: "deepseek", providerModel: "deepseek/deepseek-v4-pro", providerReasoningEffort: "high", envVars: { KEEP: "1" },
   });
-  assert.deepEqual(runtimeFormValuesFromRuntimeConfig(stored[1]!), { provider: "configured", model: "my-org/pi-custom", reasoningEffort: "low", envVars: {} });
+  assert.deepEqual(runtimeFormValuesFromRuntimeConfig(stored[1]!), { provider: "configured", model: "default", reasoningEffort: "", envVars: {} });
   // A stored Pi config without a provider (older agents) is Configured.
   assert.deepEqual(
     runtimeFormValuesFromRuntimeConfig({ runtime: "pi", model: { kind: "preset", id: "default" } }),
@@ -459,22 +435,18 @@ async function reconcile(values: Record<string, unknown>, models: RuntimeModelIn
   return { result, probed };
 }
 
-test("a Configured model only the live list names is stored as a preset (legacy picks it from the list); built-in providers keep their catalog rule", async () => {
-  const live = await reconcile({ provider: "configured", model: LIVE[0]!.id, reasoningEffort: "high" }, LIVE);
-  assert.equal(live.result.kind, "updated");
-  const config = (live.result as { runtimeConfig: RuntimeConfig }).runtimeConfig;
-  assert.deepEqual(config.model, { kind: "preset", id: LIVE[0]!.id });
-  assert.equal(config.reasoningEffort, "high");
-  assert.deepEqual(config.provider, { kind: "default" });
-  assertSameAsLegacy(config as unknown as Record<string, unknown>, legacy({ model: LIVE[0]!.id, effort: "high" }), "same as the legacy pick from the live list");
-  // Pi models declare no efforts: outside the BASE set is refused at the field.
-  assert.deepEqual(
-    (await reconcile({ provider: "configured", model: LIVE[0]!.id, reasoningEffort: "max" }, LIVE)).result,
-    { kind: "rejected", issue: { code: "reasoning_effort_not_supported", pointer: "/formValues/reasoningEffort" } },
-  );
-  // A typed model the live list does not name stays custom.
-  assert.deepEqual((await reconcile({ provider: "configured", model: "my-org/typed" }, LIVE)).result, { kind: "unchanged" });
-  // A built-in provider's model is checked against its own catalog, never the Computer's list.
+test("Configured delegates to host defaults without probing or accepting stale model choices", async () => {
+  for (const values of [
+    { provider: "configured" },
+    { provider: "configured", model: LIVE[0]!.id, reasoningEffort: "max" },
+  ]) {
+    const config = submitted(values);
+    assert.deepEqual(config.model, { kind: "preset", id: "default" });
+    assert.equal(config.reasoningEffort, null);
+    const result = await reconcile(values, LIVE);
+    assert.deepEqual(result.result, { kind: "unchanged" });
+    assert.equal(result.probed, 0);
+  }
   assert.deepEqual(
     (await reconcile({ provider: "deepseek", apiKey: "k", providerModel: "deepseek/deepseek-v4-pro", providerReasoningEffort: "high" }, LIVE)).result,
     { kind: "unchanged" },

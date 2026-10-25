@@ -95,18 +95,14 @@
         "pointer": "/model",
         "when": {
           "pointer": "/provider",
-          "in": [
-            "configured"
-          ]
+          "in": []
         }
       },
       {
         "pointer": "/reasoningEffort",
         "when": {
           "pointer": "/provider",
-          "in": [
-            "configured"
-          ]
+          "in": []
         }
       },
       {
@@ -131,7 +127,7 @@
     "localization": {
       "provider": {
         "label": "Provider",
-        "hint": "Configured uses your machine's Pi auth.json. Other options inject the matching API key as an env var so the Pi SDK picks it up — no auth.json edit on your machine."
+        "hint": "Configured automatically uses this computer's Pi default model and credentials. Other providers require their own API key."
       },
       "apiKey": {
         "label": "API Key",

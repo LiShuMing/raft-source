@@ -181,9 +181,29 @@ describe("native Desktop runtime environment", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     assert.equal(clears, 1);
     assert.deepEqual(deleted.sort(), ["assets", "auth"]);
-    assert.equal(values.get("raft_desktop_environment_generation"), "4");
+    assert.ok(values.get("raft_desktop_environment_generation")?.includes(production.apiOrigin));
     assert.equal(applyDesktopEnvironmentGeneration(production, storage, cacheStorage), false);
     assert.equal(clears, 1);
+  });
+
+  test("switching centers with the same native generation clears prior credentials", () => {
+    const values = new Map<string, string>();
+    let clears = 0;
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => { values.set(key, value); },
+      clear: () => { clears += 1; values.clear(); },
+    };
+    assert.equal(applyDesktopEnvironmentGeneration(production, storage), true);
+    values.set("token", "production-token");
+    assert.equal(applyDesktopEnvironmentGeneration(staging, storage), true);
+    assert.equal(values.has("token"), false);
+    values.set("token", "staging-token");
+    assert.equal(applyDesktopEnvironmentGeneration(staging, storage), false);
+    assert.equal(values.get("token"), "staging-token");
+    assert.equal(applyDesktopEnvironmentGeneration(production, storage), true);
+    assert.equal(values.has("token"), false);
+    assert.equal(clears, 3);
   });
 
   test("browser mode has no destructive side effect", () => {

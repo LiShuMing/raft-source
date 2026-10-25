@@ -100,7 +100,15 @@ export function applyDesktopEnvironmentGeneration(
 ): boolean {
   if (!environment || !storage) return false;
   const generationKey = "raft_desktop_environment_generation";
-  const generation = String(environment.generation);
+  // Native generation counters may restart, or be equal in two centers.
+  // Bind cached credentials to the destination as well as its generation.
+  const generation = JSON.stringify([
+    environment.environmentId,
+    environment.frontendOrigin,
+    environment.apiOrigin,
+    environment.socketOrigin,
+    environment.generation,
+  ]);
   if (storage.getItem(generationKey) !== generation) {
     // Environment switches are intentionally destructive. Distinct origins
     // isolate prod/staging; the native generation additionally forces fresh

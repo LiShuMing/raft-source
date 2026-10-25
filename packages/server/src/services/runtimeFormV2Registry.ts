@@ -849,6 +849,18 @@ function modelFormEntry(runtimeId: string, options: { live: boolean; hint?: stri
   };
 }
 
+/** OpenCode delegates model selection to the executing computer. */
+const opencodeEntry: RuntimeFormV2Entry = {
+  runtimeId: "opencode",
+  buildForm: () => buildSimpleForm("opencode", null),
+  validateProjection: () => simpleProjectionIssues(buildSimpleForm("opencode", null), false),
+  resolveOptionSource: async () => ({ kind: "source", source: null }),
+  runtimeConfigFromValues(_values, envVars) {
+    return { ok: true, runtimeConfig: simpleRuntimeConfig("opencode", { kind: "preset", id: "default" }, envVars) };
+  },
+  valuesFromRuntimeConfig: (runtimeConfig) => ({ envVars: envVarsOf(runtimeConfig) }),
+};
+
 /**
  * Antigravity chooses its model itself; the legacy web form ignores the model
  * field (runtimeIgnoresModel) and saves the stored model back unchanged. The
@@ -1439,7 +1451,8 @@ const PI_EFFORT_DERIVATION = { attribute: "supportedReasoningEfforts", defaultAt
 
 function buildPiForm(): RuntimeFormV2Definition {
   const ref = simpleFormRef("pi");
-  const configured = { pointer: "/provider", in: [PI_CONFIGURED_PROVIDER] };
+  // Keep legacy field keys compatible, but Configured delegates model and reasoning to the host.
+  const configured = { pointer: "/provider", in: [] as string[] };
   const builtin = { pointer: "/provider", in: [...PI_BUILTIN_PROVIDER_IDS] };
   const reasoningCopy = { label: "Reasoning", hint: "Available values depend on the selected model.", choices: reasoningEffortChoices() };
   const base = toRuntimeFormV2({
@@ -1475,7 +1488,7 @@ function buildPiForm(): RuntimeFormV2Definition {
         // The legacy web form's English (agent.runtimeConfig.provider / .piProviderHint).
         provider: {
           label: "Provider",
-          hint: "Configured uses your machine's Pi auth.json. Other options inject the matching API key as an env var so the Pi SDK picks it up — no auth.json edit on your machine.",
+          hint: "Configured automatically uses this computer's Pi default model and credentials. Other providers require their own API key.",
         },
         apiKey: { label: "API Key", placeholder: "sk-..." },
         model: { label: "Model", hint: "Models available from this computer's Pi configuration. You can also type a model ID." },
@@ -1618,36 +1631,26 @@ const piEntry: RuntimeFormV2Entry = {
     if (context.sourceId === "provider") return { kind: "source", source: piProviderOptionSource() };
     if (context.sourceId === "providerModel") return { kind: "source", source: piProviderModelOptionSource() };
     if (context.sourceId !== "model") return { kind: "source", source: null };
-    const probe = await probeModels(context, "pi");
-    if (probe.kind === "handled") return { kind: "handled" };
-    const options = { customModel: true, reasoning: true };
-    if (probe.kind === "live") {
-      return { kind: "source", source: reasoningModelOptionSource("pi", probe.models, probe.default, null, options) };
-    }
-    // Not live: the bundled "Configured Default / Auto" entry, marked fallback,
-    // like every other probed runtime (the legacy web form offers no list here
-    // and only a typed model; see the batch 4 notes in the README).
-    return { kind: "source", source: reasoningModelOptionSource("pi", RUNTIME_MODELS.pi ?? [], undefined, probe.reason, options) };
+    return {
+      kind: "source",
+      source: {
+        ...simpleFormRef("pi"), sourceId: "model", kind: "select", pointer: "/model",
+        options: [{ value: "default", label: "Configured Default / Auto" }],
+        defaultValue: "default", customValueAllowed: false,
+      },
+    };
   },
   runtimeConfigFromValues(values, envVars, options) {
     const providerChoice = typeof values.provider === "string" ? values.provider.trim() : "";
     const base = { version: RUNTIME_CONFIG_VERSION, runtime: "pi", mode: { kind: "default" }, envVars };
     if (providerChoice === PI_CONFIGURED_PROVIDER) {
-      const modelValue = typeof values.model === "string" ? values.model.trim() : "";
-      if (!modelValue) return formValueIssue("model_required", "model");
-      const effort = piEffort(values, "reasoningEffort");
-      if (!effort.ok) return effort;
-      // `select.custom_value`: a listed value is a preset, an unlisted typed one
-      // a custom model; reconcileWithLiveModels turns a model only the live list
-      // names back into a preset.
-      const bundled = (RUNTIME_MODELS.pi ?? []).some((model) => model.id === modelValue);
       return {
         ok: true,
         runtimeConfig: {
           ...base,
           provider: { kind: "default" },
-          model: bundled ? { kind: "preset", id: modelValue } : { kind: "custom", name: modelValue },
-          reasoningEffort: effort.value,
+          model: { kind: "preset", id: "default" },
+          reasoningEffort: null,
         },
       };
     }
@@ -1723,7 +1726,7 @@ const REGISTRY = new Map<string, RuntimeFormV2Entry>([
   // CLI, batch 3b): the admission row offers them (and so their v2 marker) only
   // as an edited agent's current runtime, and a create with them is refused like
   // any deprecated runtime.
-  ["opencode", modelFormEntry("opencode", { live: true, hint: "Models available from this computer's OpenCode configuration." })],
+  ["opencode", opencodeEntry],
   ["kimi", modelFormEntry("kimi", { live: true, hint: "Models available from this computer's Kimi CLI configuration." })],
   ["gemini", modelFormEntry("gemini", { live: false })],
   [antigravityEntry.runtimeId, antigravityEntry],
@@ -1881,6 +1884,8 @@ export async function reconcileRuntimeFormV2SubmissionWithLiveModels(input: {
 }): Promise<LiveModelReconciliation> {
   const entry = runtimeFormV2Entry(input.runtimeConfig.runtime);
   if (!entry?.reconcileWithLiveModels || !input.machineId) return { kind: "unchanged" };
+  if (input.runtimeConfig.runtime === "pi" && input.runtimeConfig.provider?.kind === "default"
+    && input.runtimeConfig.model.kind === "preset" && input.runtimeConfig.model.id === "default") return { kind: "unchanged" };
   const effort = typeof input.submittedReasoningEffort === "string" && input.submittedReasoningEffort
     ? input.submittedReasoningEffort
     : null;

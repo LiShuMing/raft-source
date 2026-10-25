@@ -2,12 +2,13 @@
  * Worker-thread entry point for the worker pool. Dispatches tasks by kind to
  * handlers from the registry; it contains no handler logic itself.
  *
- * Module resolution: spawned workers always run under the same TypeScript
- * loader as the server process — prod starts as
+ * Module resolution: source workers run under a TypeScript
+ * loader — prod starts as
  * `node --import @oxc-node/core/register` (packages/server/entrypoint.sh) and
  * the thread executor prepends that register when process.execArgv has no
  * loader (vitest) — so this file and everything it loads use the repo's
- * normal extensionless relative imports.
+ * normal extensionless relative imports. Compiled JavaScript workers inherit
+ * the parent flags without adding a source loader.
  *
  * Importing this module in the main thread is safe: the parentPort wiring is
  * guarded by `isMainThread`.

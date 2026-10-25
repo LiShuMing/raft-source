@@ -68,7 +68,7 @@ function assertSameAsLegacy(v2: Record<string, unknown>, legacy: RuntimeConfig, 
   assert.equal(JSON.stringify(parsed.config), JSON.stringify(legacy), message);
 }
 
-const MODEL_RUNTIMES = ["opencode", "kimi", "gemini"] as const;
+const MODEL_RUNTIMES = ["kimi", "gemini"] as const;
 
 test("each batch-2 form: fields, order, advanced envVars, no requiredClientCapabilities", () => {
   for (const runtime of MODEL_RUNTIMES) {
@@ -213,7 +213,7 @@ const staticSelect = (runtime: string) => ({
 });
 
 test("opencode and kimi: a live probe is the select; every non-live outcome, offline machine or probe failure falls back to the static list", async () => {
-  for (const runtime of ["opencode", "kimi"]) {
+  for (const runtime of ["kimi"]) {
     const entry = runtimeFormV2Entry(runtime)!;
     const live = optionSourceContext(async () => ({
       kind: "live",
@@ -264,4 +264,19 @@ test("stored configs of runtimes without a v2 form are not editable", () => {
   // Every catalog runtime has a v2 form since batch 4, so the example is an unknown id.
   const stored = { runtime: "not-a-runtime", model: { kind: "preset", id: "default" } } as unknown as RuntimeConfig;
   assert.equal(runtimeFormValuesFromRuntimeConfig(stored), null);
+});
+
+test("OpenCode uses host defaults without model selection or a model probe", async () => {
+  const form = parseRuntimeFormV2(wire(buildRuntimeFormV2("opencode")))!;
+  assert.deepEqual(form.fields.map(field => field.key), ["envVars"]);
+  assert.deepEqual(runtimeFormV2Entry("opencode")!.validateProjection(), []);
+  const { context, calls } = optionSourceContext(async () => { throw new Error("must not probe"); });
+  assert.deepEqual(await runtimeFormV2Entry("opencode")!.resolveOptionSource(context), { kind: "source", source: null });
+  assert.deepEqual(calls, []);
+  for (const values of [{}, { model: "stale/provider-model" }]) {
+    const config = submitted("opencode", { ...values, envVars: { KEEP: "1" } });
+    assert.deepEqual(config.model, { kind: "preset", id: "default" });
+    assert.deepEqual(config.envVars, { KEEP: "1" });
+    assert.deepEqual(runtimeFormValuesFromRuntimeConfig(config), { envVars: { KEEP: "1" } });
+  }
 });

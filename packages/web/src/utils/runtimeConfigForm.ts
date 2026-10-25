@@ -343,13 +343,15 @@ export function buildRuntimeConfig(input: {
             : { kind: "default" as const },
         }
       : {}),
-    model: runtime === "claude" && providerMode === "machine"
+    model: (runtime === "opencode" || (runtime === "pi" && !isPiBuiltin))
+      ? { kind: "preset", id: "default" }
+      : runtime === "claude" && providerMode === "machine"
       ? { kind: "machine" }
       : isBuiltInGateway || input.customModelMode
       ? { kind: "custom", name: customModelName || getDefaultModel(runtime) }
       : { kind: "preset", id: input.model || getDefaultModel(runtime) },
     mode: runtime === "claude" && providerMode === "machine" ? { kind: "default" } : mode,
-    reasoningEffort: runtime === "claude" && providerMode === "machine" ? null : input.reasoningEffort ?? null,
+    reasoningEffort: (runtime === "claude" && providerMode === "machine") || (runtime === "pi" && !isPiBuiltin) || runtime === "opencode" ? null : input.reasoningEffort ?? null,
     envVars: input.envVars ?? null,
     ...(supportsRuntimeCommand(runtime) && input.command?.trim()
       ? { command: input.command.trim() }

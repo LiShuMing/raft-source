@@ -876,7 +876,7 @@ export default function CreateAgentDialog({
   const schemaModelAllowsSubmit = schemaModelSource?.kind === "select"
     ? schemaModelSource.options.some((option) => option.value === model)
     : false;
-  const modelSourceAllowsSubmit = runtime === "claude" && providerMode === "machine" ? true : schemaBacked
+  const modelSourceAllowsSubmit = runtime === "opencode" || (runtime === "claude" && providerMode === "machine") || (runtime === "pi" && piProviderMode === PI_PROVIDER_CONFIGURED) ? true : schemaBacked
     ? schemaModelAllowsSubmit || runtimeFormDefinition.definition?.runtimeId === "builtin"
     : (runtime === "codex" && !schemaBacked) || runtimeModelSelectionIsRunnable({
     runtime,
@@ -1318,7 +1318,7 @@ export default function CreateAgentDialog({
       (!v2Active && builtInApiKeyInvalid) ||
       (!v2Active && builtInBaseUrlMissing) ||
       piApiKeyInvalid ||
-      (!v2Active && !(runtime === "claude" && providerMode === "machine") && (customModelMode || builtInGatewayModelRequired) && !model.trim())
+      (!v2Active && runtime !== "opencode" && !(runtime === "pi" && piProviderMode === PI_PROVIDER_CONFIGURED) && !(runtime === "claude" && providerMode === "machine") && (customModelMode || builtInGatewayModelRequired) && !model.trim())
     ));
 
   const handleSubmit = async (e: React.FormEvent) => {

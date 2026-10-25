@@ -1264,7 +1264,7 @@ function AgentProfileInfo({ agent, canManageAgent, canChangeAgentRole, onOpenPro
   const draftConnectionGateway = selectedProviderConnection
     ? isBuiltInGatewayProviderMode(selectedProviderConnection.providerId)
     : false;
-  const draftCustomModelInvalid = !(draftRuntime === "claude" && draftProviderMode === "machine") && (draftCustomModelMode || draftBuiltInProviderBaseUrlRequired || draftConnectionGateway) && !draftModel.trim();
+  const draftCustomModelInvalid = draftRuntime !== "opencode" && !(draftRuntime === "pi" && draftPiProviderMode === PI_PROVIDER_CONFIGURED) && !(draftRuntime === "claude" && draftProviderMode === "machine") && (draftCustomModelMode || draftBuiltInProviderBaseUrlRequired || draftConnectionGateway) && !draftModel.trim();
   const draftSchemaSelectedModel = draftSchemaModelSource?.options.find((option) => option.value === draftModel);
   const draftRetainsBuiltInPresetSelection =
     currentRuntimeConfig.runtime === "builtin" &&
@@ -1276,7 +1276,7 @@ function AgentProfileInfo({ agent, canManageAgent, canChangeAgentRole, onOpenPro
   const draftSchemaEffortInvalid = draftSchemaBacked
     && draftReasoningEffort !== null
     && !(draftSchemaSelectedModel?.supportedReasoningEfforts ?? []).includes(draftReasoningEffort);
-  const draftModelSourceInvalid = draftRuntime === "claude" && draftProviderMode === "machine" ? false : draftSchemaBacked
+  const draftModelSourceInvalid = draftRuntime === "opencode" || (draftRuntime === "claude" && draftProviderMode === "machine") || (draftRuntime === "pi" && draftPiProviderMode === PI_PROVIDER_CONFIGURED) ? false : draftSchemaBacked
     ? !draftSchemaSelectedModel || draftSchemaEffortInvalid
     : !runtimeModelSelectionIsRunnable({
         runtime: draftRuntime,
