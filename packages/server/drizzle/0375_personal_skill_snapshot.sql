@@ -1,0 +1,1 @@
+ALTER TABLE "personal_routines" ADD COLUMN "skill_snapshot" text;

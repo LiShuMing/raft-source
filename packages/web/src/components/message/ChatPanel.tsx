@@ -240,6 +240,9 @@ const BANNER_LINK_CLASS = "font-semibold text-foreground underline decoration-[1
 export default function ChatPanel({
   channel,
   hideHeader,
+  personal = false,
+  defaultAsTask = false,
+  personalAccessory,
   readOnly,
   // Stryker disable all: host defaults are exercised by browser smoke.
   showComposer = true,
@@ -252,6 +255,9 @@ export default function ChatPanel({
 }: {
   channel: Channel | null;
   hideHeader?: boolean;
+  personal?: boolean;
+  defaultAsTask?: boolean;
+  personalAccessory?: ReactNode;
   readOnly?: boolean;
   showComposer?: boolean;
   overlayComposer?: boolean;
@@ -1734,12 +1740,15 @@ export default function ChatPanel({
               />
             ) : (
               <div className="flex flex-col gap-2">
+                {personalAccessory}
                 {dmAgent ? <HostedCindyFailedBanner agent={dmAgent} /> : null}
                 {primaryComposerEligible && !isMobileComposer ? (
                   <NotificationActivationBanner placement="desktop" />
                 ) : null}
                 <MessageInput
                   channelId={channel.id}
+                  personalContext={personal}
+                  defaultAsTask={defaultAsTask}
                   deferUntilFirstPage
                   channelName={isDM ? `@${displayName}` : `#${channel.name}`}
                   showTaskButton={supportsChannelTasks}

@@ -3088,7 +3088,7 @@ registerAgentApiRoute("historyRead", async (req, res) => {
     }
 
     const renderedContents = await agentPermalinkRenderService.renderAgentReadablePermalinksInTexts(
-      shownMsgs.map((message) => message.content),
+      await (await import("../services/personalWorkspaceService")).personalAgentHistoryContents(projectionChannelId, actingAgentId, shownMsgs),
       serverId,
     );
     // Resolve the evidence key from the same authority that resolved this
@@ -6443,7 +6443,7 @@ registerAgentApiRoute("assistantOwnerMessages", ...agentApiRequestValidators("as
       ? await messageService.projectJointMessagesToLocalChannel(rawMsgs, projectionChannelId, serverId)
       : rawMsgs;
     const renderedContents = await agentPermalinkRenderService.renderAgentReadablePermalinksInTexts(
-      pageMsgs.map((message) => message.content),
+      await (await import("../services/personalWorkspaceService")).personalAgentHistoryContents(projectionChannelId, req.actingAgentId!, pageMsgs),
       serverId,
     );
     recordTraceEvent("server.agent_api.assistant.owner_messages", {

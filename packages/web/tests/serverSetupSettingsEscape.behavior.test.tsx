@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import "./helpers/domSetup";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import api from "../src/api/client";
-import ServerSetupProjectionGate, { isServerSettingsPath } from "../src/components/onboarding/ServerSetupProjectionGate";
+import ServerSetupProjectionGate, { isPersonalHomePath, isServerSettingsPath } from "../src/components/onboarding/ServerSetupProjectionGate";
 import { useServerSetupRevision } from "../src/components/onboarding/serverSetupProjection";
 import { useMachineStore } from "../src/store/machineStore";
 import { TestIntlProvider } from "./helpers/intl";
@@ -75,4 +75,14 @@ test("only this server's settings routes count as the escape", () => {
   assert.equal(isServerSettingsPath("/s/acme/settingsx", "acme"), false);
   assert.equal(isServerSettingsPath("/s/other/settings/server", "acme"), false);
   assert.equal(isServerSettingsPath("/s/acme/tasks", "acme"), false);
+});
+
+test("personal home owns its setup state while conversations retain the blocking gate", async () => {
+  await act(async () => { renderGateAt("/s/acme/personal"); });
+  await waitFor(() => assert.ok(projectionReads >= 1));
+  assert.equal(screen.queryByRole("heading", { name: "Connect a computer" }), null);
+  assert.equal(isPersonalHomePath("/s/acme/personal/", "acme"), true);
+  assert.equal(isPersonalHomePath("/s/acme/personal-other", "acme"), false);
+  assert.equal(isPersonalHomePath("/s/other/personal", "acme"), false);
+  assert.equal(isPersonalHomePath("/s/acme/dm/dm1", "acme"), false);
 });

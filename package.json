@@ -21,6 +21,7 @@
     "standalone:build": "pnpm --filter @botiverse/raft-daemon build && pnpm standalone:remote:build && pnpm --filter @botiverse/raft-web build",
     "standalone:remote:build": "node scripts/build-standalone-remote.mjs",
     "standalone": "pnpm --filter @botiverse/raft-server standalone",
+    "personal:mac:build": "node scripts/build-personal-mac.mjs",
     "standalone:test": "pnpm --filter @botiverse/raft-server test -- src/standalone/ --maxWorkers=1 --testTimeout=30000 --hookTimeout=30000"
   },
   "devDependencies": {

@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { isStandaloneMode } from "../config/deploymentMode";
 import { isInTransaction } from "../db/ambientTransaction";
 import { asc, eq, inArray, sql, and, or } from "drizzle-orm";
 import { getDb, type DatabaseExecutor, type DatabaseTransaction } from "../db/index";
@@ -621,11 +622,17 @@ function evaluateFlagRow(
   const percentageRule = matchPercentageRule(flag, rules, input);
   if (percentageRule) return percentageRule;
 
+  // Vendor rollout audiences do not describe a user's standalone installation.
+  // Only this local capability changes its default; explicit rules, disabled
+  // flags and the kill switch above remain authoritative on every API/client.
+  const defaultEnabled = flag.defaultEnabled || (
+    isStandaloneMode() && key === PROVIDER_CONNECTIONS_FEATURE_FLAG_KEY && !!input.serverId
+  );
   return {
     key,
-    enabled: flag.defaultEnabled,
+    enabled: defaultEnabled,
     reason: "default",
-    ...(flag.defaultEnabled && flag.defaultVariant ? { variant: flag.defaultVariant } : {}),
+    ...(defaultEnabled && flag.defaultVariant ? { variant: flag.defaultVariant } : {}),
   };
 }
 

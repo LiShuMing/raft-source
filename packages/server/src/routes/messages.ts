@@ -1804,6 +1804,9 @@ async function createHumanMessage(
     const io = req.app.get("io");
     const agentOrchestrator = req.app.get("agentOrchestrator") as AgentOrchestrator;
     // slack-bridge-ordinary-message-producer: messages.create
+    const personalContext = req.body.personalContext === true
+      ? await (await import("../services/personalWorkspaceService")).personalMessageContext(channelId, userId, typeof content === "string" ? content : "")
+      : undefined;
     const enriched = await messageService.broadcastAndDeliver(io, agentOrchestrator, {
       channelId,
       senderType: "user",
@@ -1816,6 +1819,7 @@ async function createHumanMessage(
       asTask,
       mentionContract,
       senderTimezone,
+      agentContentPrefix: personalContext,
     });
 
     if (mentions.some((m) => m.type === "agent")) {

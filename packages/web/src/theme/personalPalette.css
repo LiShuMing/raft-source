@@ -1,0 +1,108 @@
+/* Application-owned palette. Keep library components, remove the yellow brand. */
+:root.light,
+:root.dark {
+  --brand-50: oklch(0.98 0 0);
+  --brand-100: oklch(0.95 0 0);
+  --brand-200: oklch(0.88 0 0);
+  --brand-300: oklch(0.78 0 0);
+  --brand-400: oklch(0.30 0 0);
+  --brand-500: oklch(0.27 0 0);
+  --brand-600: oklch(0.24 0 0);
+  --brand-700: oklch(0.21 0 0);
+  --brand-800: oklch(0.18 0 0);
+  --brand-900: oklch(0.15 0 0);
+  --brand-950: oklch(0.12 0 0);
+  --brand-hover: oklch(0.38 0 0);
+  --brand-active: oklch(0.24 0 0);
+  --brand-glow: transparent;
+}
+
+:root.light {
+  --foreground: oklch(0.24 0 0);
+  --foreground-muted: oklch(0.50 0 0);
+  --foreground-hint: oklch(0.57 0 0);
+  --foreground-inverse: oklch(1 0 0);
+  --foreground-on-frame: var(--foreground);
+  --foreground-on-frame-active: var(--foreground);
+  --foreground-on-frame-muted: var(--foreground-muted);
+  --layer-frame: oklch(0.985 0 0);
+  --layer-frame-active: oklch(0.94 0 0);
+  --layer-sidebar: oklch(0.985 0 0);
+  --layer-canvas: oklch(1 0 0);
+  --layer-card: oklch(1 0 0);
+  --line-seam: oklch(0.90 0 0);
+  --line-hairline: oklch(0.94 0 0);
+  --line-frame-active: var(--line-seam);
+  --brand-strong: var(--foreground);
+  --brand-soft: oklch(0.93 0 0);
+  --palette-cream-200: var(--layer-sidebar);
+}
+
+:root.dark {
+  --foreground: oklch(0.94 0 0);
+  --foreground-muted: oklch(0.72 0 0);
+  --foreground-hint: oklch(0.64 0 0);
+  --foreground-inverse: oklch(0.20 0 0);
+  --foreground-on-frame: var(--foreground);
+  --foreground-on-frame-active: var(--foreground);
+  --foreground-on-frame-muted: var(--foreground-muted);
+  --layer-frame: oklch(0.18 0 0);
+  --layer-frame-active: oklch(0.29 0 0);
+  --layer-sidebar: oklch(0.18 0 0);
+  --layer-canvas: oklch(0.22 0 0);
+  --layer-card: oklch(0.25 0 0);
+  --layer-popover: oklch(0.26 0 0);
+  --line-seam: oklch(0.33 0 0);
+  --line-hairline: oklch(0.28 0 0);
+  --line-frame-active: var(--line-seam);
+  --brand-400: oklch(0.88 0 0);
+  --brand-hover: oklch(0.78 0 0);
+  --brand-active: oklch(0.72 0 0);
+  --brand-strong: var(--foreground);
+  --brand-soft: oklch(0.30 0 0);
+  --palette-cream-200: var(--layer-sidebar);
+}
+
+.personal-navigation-link {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  color: var(--foreground-muted);
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+
+.personal-navigation-link:hover,
+.personal-navigation-link[aria-current="page"] {
+  color: var(--foreground);
+  background: var(--fill-muted);
+}
+
+.personal-navigation-link:focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: 2px;
+}
+
+:root [data-slot="button"] {
+  font-weight: 500;
+  border-width: 1px;
+  box-shadow: none;
+}
+
+:root [data-slot="button"]:is(.bg-attention-400, .bg-brand, .bg-brand-400):not(:disabled):not([aria-disabled="true"]) {
+  color: var(--foreground-inverse);
+  background: var(--brand-400);
+  border-color: transparent;
+}
+
+:root [data-slot="button"]:is(.bg-attention-400, .bg-brand, .bg-brand-400):not(:disabled):not([aria-disabled="true"]):hover {
+  background: var(--brand-hover);
+}
+
+:root [data-slot="button"]:focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: 2px;
+}

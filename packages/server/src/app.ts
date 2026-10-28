@@ -67,6 +67,7 @@ import { productEventsRouter } from "./routes/productEvents";
 import { managedMcpOAuthCallbackRouter, managedMcpRouter } from "./routes/managedMcp";
 import { agentConnectionCallbackRouter } from "./routes/agentConnectionCallback";
 import { providerConnectionRouter } from "./routes/providerConnections";
+import { personalWorkspaceRouter } from "./routes/personalWorkspace";
 import { agentRuntimeProviderRouter } from "./routes/agentRuntimeProviders";
 import { productFeedbackRouter } from "./routes/productFeedback";
 import { releaseNotesRouter } from "./routes/releaseNotes";
@@ -787,6 +788,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
   app.use("/api/mcp/oauth", authLimiter, managedMcpOAuthCallbackRouter);
   app.use("/api/mcp", requireAuth, requireVerified, requireServer, managedMcpRouter);
   app.use("/api/provider-connections", requireAuth, requireVerified, requireServer, providerConnectionRouter);
+  app.use("/api/personal", requireAuth, requireVerified, requireServer, personalWorkspaceRouter);
   app.use("/api/agent-runtime-providers", requireAuth, requireVerified, requireServer, agentRuntimeProviderRouter);
   // A hosted runtime provider returns the browser here after an account-connection
   // OAuth round trip; the route only forwards the outcome to the web landing page.

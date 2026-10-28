@@ -2,6 +2,7 @@
 
 @import "tailwindcss";
 @import "@botiverse/raft-ui/styles.css";
+@import "./theme/personalPalette.css";
 @import "./components/mermaid/mermaid.css";
 
 

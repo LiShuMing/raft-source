@@ -113,6 +113,8 @@ import {
   RAFT_LIGHT_THEME_CHROME_COLOR,
 } from "../../theme/appThemeChrome";
 import { observeProfileOpenE2eImport } from "../../utils/profileOpenE2eTimeline";
+import { isStandaloneDeployment } from "../../utils/deploymentMode";
+import PersonalNavigation from "../personal/PersonalNavigation";
 
 const MOBILE_TAB_BAR_SAFE_BOTTOM = "min(env(safe-area-inset-bottom, 0px), 34px)";
 const IN_FLOW_TAB_BAR_STYLE = { paddingBottom: MOBILE_TAB_BAR_SAFE_BOTTOM };
@@ -134,6 +136,7 @@ const ReleaseNotesPanel = lazy(() => import("../settings/ReleaseNotesPanel"));
 const ThreadsInbox = lazy(() => import("../thread/ThreadsInbox"));
 const TasksPanel = lazy(() => import("../task/TasksPanel"));
 const SavedPanel = lazy(() => import("../saved/SavedPanel"));
+const PersonalWorkspace = lazy(() => import("../personal/PersonalWorkspace"));
 const ProfilePanel = lazy(() => observeProfileOpenE2eImport(
   "profile-panel",
   () => import("../profile/ProfilePanel"),
@@ -828,9 +831,9 @@ function DefaultRoute() {
   const disclosureRestoreState = useMemo(() => buildSidebarDisclosureRestoreState(), []);
   const suppressDefaultRouteRedirect =
     (location.state as { suppressDefaultRouteRedirect?: unknown } | null)?.suppressDefaultRouteRedirect === true;
-  const defaultChannelPath = slug && channels[0]
-    ? `/s/${slug}/channel/${channels[0].id}`
-    : null;
+  const defaultChannelPath = slug && isStandaloneDeployment()
+    ? `/s/${slug}/personal`
+    : slug && channels[0] ? `/s/${slug}/channel/${channels[0].id}` : null;
   // On mobile, don't auto-redirect — the sidebar (channel list) is shown inline
   // as the main content via the master-detail layout in MainLayout.
   const shouldRedirect = Boolean(
@@ -866,6 +869,7 @@ function DefaultRoute() {
   if (loading) {
     return null;
   }
+  if (slug && isStandaloneDeployment()) return <Navigate to={`/s/${slug}/personal`} replace />;
   // Desktop: show empty state. Mobile: this won't be visible (sidebar is shown instead).
   return <ChatPanel channel={null} />;
 }
@@ -1594,6 +1598,7 @@ function useSearchContentUrlSync() {
 
 
 export default function MainLayout() {
+  const personalShell = isStandaloneDeployment() && !isHostShell();
   // Shared model-label catalog (task #700): the shell owns the load trigger
   // (server changes while the app is up); rows and panels only subscribe, so
   // every surface switches to the reported names together.
@@ -1782,7 +1787,7 @@ export default function MainLayout() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       blurFocusedControlForScreenshotShortcut(event);
-      if (isGlobalSearchShortcut(event)) {
+      if (isGlobalSearchShortcut(event) && !/\/personal(?:\/|$)/.test(location.pathname)) {
         event.preventDefault();
         if (!serverSlug) return;
         const searchPath = `/s/${serverSlug}/search`;
@@ -1851,7 +1856,7 @@ export default function MainLayout() {
   const isMembersRoot = path === `${pathBase}/members` || path === `${pathBase}/members/`;
   const isSettingsRoot = path === `${pathBase}/settings` || path === `${pathBase}/settings/`;
   const isMobileMasterRoute = isDefaultRoute || isMembersRoot || isSettingsRoot;
-  const mobileShowSidebarInline = !isDesktop && isMobileMasterRoute;
+  const mobileShowSidebarInline = !personalShell && !isDesktop && isMobileMasterRoute;
 
   // Tasks rail mode is single-page: TasksPanel owns its own filtering UI
   // and there is no master/detail navigation inside Tasks, so we skip the
@@ -1901,7 +1906,9 @@ export default function MainLayout() {
     searchMasterDetail && threadOpenForLayout && !!searchSlotKind && searchSlotKind !== "thread";
   const contentRouteProfileOverlayOpen = searchMasterDetail && profileOpenForLayout;
   const searchColTwoCompact = contentRouteThreadOverlayOpen || contentRouteProfileOverlayOpen;
-  const hideSidebar = isTasksRoute || (isContentRoute && !searchMasterDetail);
+  const isPersonalRoute = path.replace(/\/$/, "") === `${pathBase}/personal` || path.startsWith(`${pathBase}/personal/`);
+  const personalConversation = personalShell && (isDefaultRoute || path.startsWith(`${pathBase}/dm/`));
+  const hideSidebar = personalConversation || isPersonalRoute || isTasksRoute || (isContentRoute && !searchMasterDetail);
   const isMobileTabRoot = mobileShowSidebarInline || (!isDesktop && isTasksRoute);
   // iOS-standalone chrome buckets (Raft Design System › NavBar): a tab root's
   // top bar is the frame (yellow in light, #0d0d0b in dark), a pushed detail's
@@ -1948,7 +1955,7 @@ export default function MainLayout() {
       //   cannot be applied reliably
       // - mobile detail routes still update theme-color and this wrapper to match
       //   their white top surface
-      className="min-h-0 flex-1 flex-col font-display"
+      className={`min-h-0 flex-1 flex-col font-display${personalShell ? " personal-shell" : ""}`}
       // iOS standalone: the wrapper above the safe-area inset paints the
       // route's chrome colour itself, so the status-bar strip matches
       // `meta[theme-color]` (task #638, ios-standalone-chrome spec).
@@ -1962,19 +1969,20 @@ export default function MainLayout() {
           list visible without stealing layout height. */}
       <PwaInstallPrompt />
 
-      {showTopBar ? <ShellTopBar /> : null}
+      {showTopBar && !personalShell && !isPersonalRoute ? <ShellTopBar /> : null}
+      {personalShell && !isPersonalRoute ? <PersonalNavigation mobile /> : null}
 
       <div className="flex min-h-0 flex-1">
         {/* Left rail — desktop only. Hosts server switcher (top), sidebar tab
             icons (Chat/Members), and Settings (bottom). On mobile the
             equivalent surfaces live in the in-Sidebar server header and the
             bottom MobileTabBar. */}
-        <AppShellRailSlot>
+        {isPersonalRoute ? null : personalShell ? <PersonalNavigation /> : <AppShellRailSlot>
           <LeftRail
             hidden={mobileShowSidebarInline}
             topBar={showTopBar}
           />
-        </AppShellRailSlot>
+        </AppShellRailSlot>}
 
         {/* Sidebar container:
             - Mobile root: relative, full width, inline as main content (the "Chat tab")
@@ -2109,6 +2117,7 @@ export default function MainLayout() {
               data-testid="thread-main-column"
             >
               <Routes location={backgroundLocation ?? location}>
+                <Route path="personal/*" element={<Suspense fallback={<PanelFallback />}><PersonalWorkspace key={currentServerId} /></Suspense>} />
                 <Route path="channel/:channelId" element={<ChannelRoute />} />
                 <Route path="dm/:dmId" element={<DmRoute />} />
                 <Route path="agent/:agentId" element={<AgentRoute />} />
@@ -2143,7 +2152,7 @@ export default function MainLayout() {
         </AppShellMainSlot>
       </div>
 
-      <MobileTabBar />
+      {!personalShell && !isPersonalRoute && <MobileTabBar />}
       {currentServerId && serverSlug ? (
         <ServerSetupProjectionGate
           serverId={currentServerId}

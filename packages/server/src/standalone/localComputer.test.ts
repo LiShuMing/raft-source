@@ -100,12 +100,12 @@ test("revoked attachments do not reconnect or silently create replacement creden
 test("runner keeps native configuration locations and excludes server credentials", () => {
   const base = {
     HOME: "/native-home", PATH: "/native-bin", CLAUDE_CONFIG_DIR: "/native-claude", CODEX_HOME: "/native-codex",
-    JWT_SECRET: "server-only", DATABASE_URL: "server-only", AGENT_API_KEY_HMAC_SECRET: "server-only",
+    JWT_SECRET: "server-only", DATABASE_URL: "server-only", AGENT_API_KEY_HMAC_SECRET: "server-only", SLOCK_PROVIDER_CREDENTIAL_KEY: "server-only",
     NODE_OPTIONS: "server-only", ANTHROPIC_BASE_URL: "https://models.example.test", OPENAI_API_KEY: "native-provider",
   };
   const env = localRunnerEnvironment("/isolated-raft", base);
   for (const key of ["HOME", "PATH", "CLAUDE_CONFIG_DIR", "CODEX_HOME", "ANTHROPIC_BASE_URL", "OPENAI_API_KEY"] as const) assert.equal(env[key], base[key]);
-  for (const key of ["JWT_SECRET", "DATABASE_URL", "AGENT_API_KEY_HMAC_SECRET", "NODE_OPTIONS"]) assert.equal(env[key], undefined);
+  for (const key of ["JWT_SECRET", "DATABASE_URL", "AGENT_API_KEY_HMAC_SECRET", "SLOCK_PROVIDER_CREDENTIAL_KEY", "NODE_OPTIONS"]) assert.equal(env[key], undefined);
   assert.equal(env.RAFT_HOME, "/isolated-raft");
   assert.equal(env.SLOCK_HOME, "/isolated-raft");
   assert.equal(env.SLOCK_DAEMON_TRACE_UPLOAD_DISABLED, "1");

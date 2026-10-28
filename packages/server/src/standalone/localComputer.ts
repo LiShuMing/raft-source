@@ -36,6 +36,7 @@ export function localRunnerEnvironment(raftHome: string, base: NodeJS.ProcessEnv
   }
   delete env.NODE_OPTIONS;
   delete env.SLOCK_DAEMON_API_KEY_FILE;
+  delete env.SLOCK_PROVIDER_CREDENTIAL_KEY;
   return {
     ...env,
     RAFT_HOME: raftHome,

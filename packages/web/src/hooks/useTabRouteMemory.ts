@@ -71,6 +71,7 @@ function isServerSurfaceRoute(pathname: string, pathBase: string): boolean {
   if (pathname === pathBase || pathname === `${pathBase}/`) return true;
   if (!pathname.startsWith(`${pathBase}/`)) return false;
   const rest = pathname.slice(pathBase.length);
+  if (rest === "/personal" || rest === "/personal/") return true;
   if (rest.startsWith("/channel/")) return true;
   if (rest.startsWith("/dm/")) return true;
   if (rest === "/threads" || rest.startsWith("/threads/")) return true;

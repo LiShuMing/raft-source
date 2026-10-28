@@ -45,3 +45,4 @@ coverage/
 
 # Single-machine state when explicitly placed inside this checkout.
 /.raft-standalone/
+/.local/personal-agent/

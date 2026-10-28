@@ -1,3 +1,4 @@
+import { startPersonalRoutineWorker } from "./services/personalRoutineWorker";
 import { LocalComputerManager } from "./standalone/localComputer";
 import { createLocalReplicaStateStore } from "./standalone/localReplicaStateStore";
 import { standalonePaths } from "./standalone/config";
@@ -380,6 +381,7 @@ async function bootstrap() {
 
   // Reminder arm watchdog: resyncs missing Computer armed(revision) receipts.
   // It never fires/wakes; due-time authority is Computer-local.
+  const personalRoutineWorker = startPersonalRoutineWorker(io, agentOrchestrator);
   const reminderArmWatchdog = startReminderArmWatchdog({ orchestrator: agentOrchestrator, tracer: serverTracer.tracer });
   const mobilePushOutboxWorker = startMobilePushOutboxWorker({ tracer: serverTracer.tracer });
   const readMutationWorker = startReadMutationWorker({ tracer: serverTracer.tracer });
@@ -549,6 +551,7 @@ async function bootstrap() {
     stopAttachmentUploadSessionCleanup();
     stopAttachmentLifecycleSweep();
     reminderArmWatchdog.stop();
+    personalRoutineWorker.stop();
     mobilePushOutboxWorker.stop();
     readMutationWorker.stop();
     appNotificationDeliveryWorker.stop();

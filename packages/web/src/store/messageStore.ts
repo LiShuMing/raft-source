@@ -404,6 +404,7 @@ export interface MessageState {
     optimisticId?: string,
     randomId?: string,
     mentions?: MessageMention[],
+    personalContext?: boolean,
   ) => Promise<SendMessageResult>;
   loadMessageContext: (channelId: string, messageId: string) => Promise<void>;
   // Silent variant for resuming a remembered scroll position. Loads the same
@@ -2407,7 +2408,7 @@ export const useMessageStore = create<MessageState>((set, get) => ({
       }, byChannel.keys());
     }),
 
-  sendMessage: async (channelId, content, attachmentIds, asTask, optimisticId, randomId, mentions) => {
+  sendMessage: async (channelId, content, attachmentIds, asTask, optimisticId, randomId, mentions, personalContext) => {
     const ingressContext = captureReceiverPrivateIngressContext(get().currentUserId);
     const { data } = await api.post("/v2/messages", {
       channelId,
@@ -2418,6 +2419,7 @@ export const useMessageStore = create<MessageState>((set, get) => ({
       mentions: mentions && mentions.length > 0 ? mentions : undefined,
       // The sender's IANA zone, recorded on the message for agents only.
       timezone: detectBrowserTimezone() ?? undefined,
+      ...(personalContext ? { personalContext: true } : {}),
     });
     const normalizedResponse = normalizeSendMessageResponse(data);
     const message = coerceCurrentReceiverPrivateMessage(

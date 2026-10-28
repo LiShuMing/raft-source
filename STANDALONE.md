@@ -1,5 +1,28 @@
 # Raft standalone
 
+## Personal Agent exploration
+
+The product research, source walkthrough, Mac-first design and GPUI Kit assessment
+are indexed in [docs/personal-agent/README.md](docs/personal-agent/README.md).
+The first working slice is available at `/s/<workspace-slug>/personal`, or through
+the Personal assistant rail item. It sends real message tasks to existing Agents
+and reuses the original Computer and AI Providers settings. It is a Web slice,
+not a packaged Mac application. The personal home owns its empty/setup guidance;
+existing conversations still use the original workspace onboarding flow.
+
+Fresh standalone profiles now keep a separate AES credential-encryption key in
+`<state>/provider-credential-key` (0600). Back it up with the database; losing it
+makes saved provider credentials unreadable. An explicitly configured
+`SLOCK_PROVIDER_CREDENTIAL_KEY` retains precedence and must remain stable.
+Corruption fails startup rather than silently rotating the key. This key is not
+passed into the supervised local runner; native provider configuration remains
+on the execution Computer.
+
+Provider connections default to enabled in standalone after normal feature-flag
+evaluation. Explicit deny rules, a disabled flag and the kill switch still apply.
+Standard deployments retain their existing rollout defaults. Saving a connection
+does not verify its credentials or prove that a selected Computer can reach it.
+
 Status: infrastructure, password-based local sign-in and source-built local
 Computer supervision are implemented. A real browser has connected the host,
 detected native runtimes and verified reconnection after a server restart. Native
@@ -393,3 +416,9 @@ not a consequence of importing the original packages.
 Keep the repository's FSL-1.1-ALv2 terms and existing notices. Published library
 packages can have different licenses (for example Raft UI's MIT package). A
 standalone deployment profile does not relicense the original application.
+
+## Personal workspace v0.2
+
+`/s/:slug/personal` now provides the assistant workbench, private library revisions, platform memory and skills, scheduled-work ledger, internal message drafts, workgroups, and existing application/provider/computer settings. It uses the original message, task, daemon, and runtime services. See [implementation and acceptance boundaries](docs/personal-agent/implementation-v02.md).
+
+After `pnpm standalone:build`, run `pnpm personal:mac:build` on macOS to build `.local/personal-agent/Personal Agent.app`. This development bundle depends on the current checkout and Node runtime. Closing its window retains background work; quitting stops only a service it started. It is not a notarized, portable distribution.

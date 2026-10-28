@@ -7699,3 +7699,93 @@ export const raftbenchFindings = pgTable("raftbench_findings", {
   sourceRefs: jsonb("source_refs").$type<Array<{ messageId: string; channelId: string; storageChannelId: string; sourceVersion: string }>>().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, t => [uniqueIndex("idx_raftbench_finding_fingerprint").on(t.serverId, t.revision, t.fingerprint)]);
+
+// Personal workspace extension: user-owned configuration, immutable revisions and durable operation receipts.
+export const personalResources = pgTable("personal_resources", {
+  id: uuid("id").primaryKey().$defaultFn(() => randomUUID()),
+  serverId: uuid("server_id").notNull().references(() => servers.id, { onDelete: "cascade" }),
+  ownerUserId: uuid("owner_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  agentId: uuid("agent_id").references(() => agents.id, { onDelete: "cascade" }),
+  kind: text("kind", { enum: ["memory", "skill"] }).notNull(),
+  title: text("title").notNull(), content: text("content").notNull(),
+  sourceMessageId: uuid("source_message_id").references(() => messages.id, { onDelete: "set null" }),
+  enabled: boolean("enabled").notNull().default(true), version: integer("version").notNull().default(1),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [index("personal_resources_owner").on(t.serverId, t.ownerUserId), check("personal_resource_kind", sql`${t.kind} IN ('memory','skill')`)]);
+export const personalResourceRevisions = pgTable("personal_resource_revisions", {
+  resourceId: uuid("resource_id").notNull().references(() => personalResources.id, { onDelete: "cascade" }),
+  version: integer("version").notNull(), title: text("title").notNull(), content: text("content").notNull(), enabled: boolean("enabled").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.resourceId, t.version] })]);
+export const personalArtifacts = pgTable("personal_artifacts", {
+  id: uuid("id").primaryKey().$defaultFn(() => randomUUID()),
+  serverId: uuid("server_id").notNull().references(() => servers.id, { onDelete: "cascade" }),
+  ownerUserId: uuid("owner_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  agentId: uuid("agent_id").references(() => agents.id, { onDelete: "set null" }),
+  channelId: uuid("channel_id").notNull().references(() => channels.id, { onDelete: "cascade" }),
+  sourceMessageId: uuid("source_message_id").references(() => messages.id, { onDelete: "set null" }),
+  title: text("title").notNull(), version: integer("version").notNull().default(1),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [index("personal_artifacts_owner").on(t.serverId, t.ownerUserId)]);
+export const personalArtifactRevisions = pgTable("personal_artifact_revisions", {
+  artifactId: uuid("artifact_id").notNull().references(() => personalArtifacts.id, { onDelete: "cascade" }),
+  revision: integer("revision").notNull(), content: text("content").notNull(), digest: text("digest").notNull(),
+  sourceMessageId: uuid("source_message_id").references(() => messages.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.artifactId, t.revision] })]);
+export const personalRoutines = pgTable("personal_routines", {
+  id: uuid("id").primaryKey().$defaultFn(() => randomUUID()),
+  serverId: uuid("server_id").notNull().references(() => servers.id, { onDelete: "cascade" }),
+  ownerUserId: uuid("owner_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  agentId: uuid("agent_id").notNull().references(() => agents.id, { onDelete: "cascade" }),
+  channelId: uuid("channel_id").notNull().references(() => channels.id, { onDelete: "cascade" }),
+  title: text("title").notNull(), instruction: text("instruction").notNull(),
+  schedule: text("schedule", { enum: ["daily", "weekdays", "weekly"] }).notNull(),
+  time: text("time").notNull(), timezone: text("timezone").notNull(), weekday: integer("weekday").notNull().default(2),
+  skillId: uuid("skill_id").references(() => personalResources.id, { onDelete: "set null" }), skillVersion: integer("skill_version"),
+  skillSnapshot: text("skill_snapshot"),
+  enabled: boolean("enabled").notNull().default(true), version: integer("version").notNull().default(1),
+  nextRunAt: timestamp("next_run_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [index("personal_routines_due").on(t.enabled, t.nextRunAt), index("personal_routines_owner").on(t.serverId, t.ownerUserId)]);
+export const personalRoutineRuns = pgTable("personal_routine_runs", {
+  id: uuid("id").primaryKey().$defaultFn(() => randomUUID()),
+  routineId: uuid("routine_id").notNull().references(() => personalRoutines.id, { onDelete: "cascade" }),
+  scheduleVersion: integer("schedule_version").notNull(), scheduledFor: timestamp("scheduled_for", { withTimezone: true }).notNull(),
+  trigger: text("trigger", { enum: ["scheduled", "test"] }).notNull(),
+  status: text("status", { enum: ["queued", "dispatched", "completed", "missed", "failed"] }).notNull().default("queued"),
+  messageId: uuid("message_id").references(() => messages.id, { onDelete: "set null" }),
+  instruction: text("instruction").notNull(), errorCode: text("error_code"), leaseUntil: timestamp("lease_until", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [uniqueIndex("personal_routine_occurrence").on(t.routineId, t.scheduleVersion, t.scheduledFor, t.trigger), index("personal_routine_run_status").on(t.status, t.leaseUntil)]);
+export const personalDrafts = pgTable("personal_drafts", {
+  id: uuid("id").primaryKey().$defaultFn(() => randomUUID()),
+  serverId: uuid("server_id").notNull().references(() => servers.id, { onDelete: "cascade" }),
+  ownerUserId: uuid("owner_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  channelId: uuid("channel_id").notNull().references(() => channels.id, { onDelete: "cascade" }),
+  targetChannelId: uuid("target_channel_id").notNull().references(() => channels.id, { onDelete: "cascade" }),
+  title: text("title").notNull(), content: text("content").notNull(), version: integer("version").notNull().default(1), digest: text("digest").notNull(),
+  state: text("state", { enum: ["pending", "denied", "executing", "executed", "unknown", "expired"] }).notNull().default("pending"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  receiptMessageId: uuid("receipt_message_id").references(() => messages.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [index("personal_drafts_owner").on(t.serverId, t.ownerUserId)]);
+export const personalGroups = pgTable("personal_groups", {
+  id: uuid("id").primaryKey().$defaultFn(() => randomUUID()),
+  serverId: uuid("server_id").notNull().references(() => servers.id, { onDelete: "cascade" }),
+  ownerUserId: uuid("owner_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  channelId: uuid("channel_id").notNull().references(() => channels.id, { onDelete: "cascade" }),
+  title: text("title").notNull(), agentIds: jsonb("agent_ids").$type<string[]>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [index("personal_groups_owner").on(t.serverId, t.ownerUserId)]);
+export const personalPreferences = pgTable("personal_preferences", {
+  serverId: uuid("server_id").notNull().references(() => servers.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  value: jsonb("value").$type<Record<string, unknown>>().notNull().default({}),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.serverId, t.userId] })]);

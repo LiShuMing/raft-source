@@ -7,6 +7,7 @@ test("server surface memory keeps deep server routes with right-panel query", ()
     "/s/dev/channel/ch1?thread=ch1:msg1&msg=reply#latest",
   );
   assert.equal(normalizeServerSurfaceMemory("dev", "/s/dev/tasks"), "/s/dev/tasks");
+  assert.equal(normalizeServerSurfaceMemory("dev", "/s/dev/personal"), "/s/dev/personal");
   assert.equal(normalizeServerSurfaceMemory("dev", "/s/dev/search?q=release"), "/s/dev/search?q=release");
   assert.equal(normalizeServerSurfaceMemory("dev", "/s/dev/settings/admin"), "/s/dev/settings/admin");
 });

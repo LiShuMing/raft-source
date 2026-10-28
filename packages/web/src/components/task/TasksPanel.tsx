@@ -35,6 +35,8 @@ import {
   TasksPanelViewport,
 } from "@botiverse/raft-ui";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import { isStandaloneDeployment } from "../../utils/deploymentMode";
 import { useIntl } from "react-intl";
 import { CheckSquare, ChevronDown, Columns3, Hash, LayoutList, Plus, User as UserIcon, UserCircle2 } from "lucide-react";
 import {
@@ -107,6 +109,15 @@ interface IdentityOption {
 type ViewMode = "board" | "list";
 
 const TASK_VIEW_MODE_STORAGE_KEY = "slock.tasks.viewMode";
+
+function TaskFilterControls({ children, active }: { children: ReactNode; active: boolean }) {
+  const { formatMessage } = useIntl();
+  if (!isStandaloneDeployment()) return <>{children}</>;
+  return <details className="relative">
+    <summary className="cursor-pointer rounded-md px-3 py-2 text-sm text-foreground-muted">{formatMessage({ id: active ? "personal.filtersActive" : "personal.filters" })}</summary>
+    <div className="mt-2 flex flex-wrap gap-2">{children}</div>
+  </details>;
+}
 
 const STATUS_ORDER: TaskStatus[] = ["todo", "in_progress", "in_review", "done", "closed"];
 
@@ -677,7 +688,7 @@ export default function TasksPanel({ channelId }: TasksPanelProps = {}) {
     const param = parseTaskViewMode(searchParams.get("view"));
     if (param) return param;
     if (storedViewMode) return storedViewMode;
-    return isMobile ? "list" : "board";
+    return isMobile || isStandaloneDeployment() ? "list" : "board";
   }, [searchParams, storedViewMode, isMobile]);
 
   // dnd-kit sensors — PointerSensor for mouse/stylus, TouchSensor for touch.
@@ -1052,6 +1063,7 @@ export default function TasksPanel({ channelId }: TasksPanelProps = {}) {
 
       <TasksPanelToolbar>
         <div className="flex flex-wrap items-center gap-2">
+          <TaskFilterControls active={hasAnyFilter}>
           {/* Channel filter only makes sense in server mode — channel mode
               is already scoped to one channel. */}
           {!isChannelMode && (
@@ -1135,6 +1147,7 @@ export default function TasksPanel({ channelId }: TasksPanelProps = {}) {
             </Button>
           )}
 
+          </TaskFilterControls>
           <SegmentedControl
             value={viewMode}
             onValueChange={setView}

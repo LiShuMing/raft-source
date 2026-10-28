@@ -705,6 +705,8 @@ export default function MessageInput({
   channelId,
   channelName,
   showTaskButton,
+  personalContext = false,
+  defaultAsTask = false,
   onWillSend,
   resolveChannelId,
   onChannelResolved,
@@ -734,6 +736,8 @@ export default function MessageInput({
   channelId: string;
   channelName: string;
   showTaskButton?: boolean;
+  personalContext?: boolean;
+  defaultAsTask?: boolean;
   onWillSend?: () => void | Promise<void>;
   /**
    * Lazily resolve the durable delivery channel before the first upload/send.
@@ -819,7 +823,7 @@ export default function MessageInput({
   // Stryker disable next-line all: optimistic rollback is covered by send-failure tests outside this attachment-draft mutation slice.
   const removeOptimisticMessage = useMessageStore((s) => s.removeOptimisticMessage);
   // Stryker disable next-line all: task-toggle default state is covered by MessageInput submit-contract tests outside this attachment-draft mutation slice.
-  const [alsoCreateTask, setAlsoCreateTask] = useState(false);
+  const [alsoCreateTask, setAlsoCreateTask] = useState(defaultAsTask);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const contentRef = useRef(content);
   const pendingSenderMentionCursorRef = useRef<number | null>(null);
@@ -2283,7 +2287,7 @@ export default function MessageInput({
       // Send message with already-uploaded attachment ids — server response
       // arrives via socket, which auto-replaces the optimistic message.
       // Stryker disable next-line MethodExpression: the preceding missing-id guard makes the defensive filter equivalent for UI submits; behavior tests pin the forwarded ids.
-      const sendResult = await sendMessage(deliveryChannelId, messageContent, attachmentIds.filter((id): id is string => Boolean(id)), submitAsTask || undefined, optimisticId, optimisticDraft.randomId, hasContent ? mentionsToSend : undefined);
+      const sendResult = await sendMessage(deliveryChannelId, messageContent, attachmentIds.filter((id): id is string => Boolean(id)), submitAsTask || undefined, optimisticId, optimisticDraft.randomId, hasContent ? mentionsToSend : undefined, personalContext);
       onChannelResolved?.(deliveryChannelId);
       setPendingMentionActions(sendResult.pendingMentionActions);
       setUnresolvedMentionHandles(sendResult.unresolvedMentionHandles ?? []);
@@ -2339,7 +2343,7 @@ export default function MessageInput({
     isCommittedComposerOwner, startAttachmentUpload, restoreFailedSendDraft,
     clearDraft, dismissMentionPopover, dismissChannelPopover,
     cancelScheduledAutoResize, onWillSend, addOptimisticMessage, currentUser,
-    conversionBlockedMessage, sendMessage, onChannelResolved, setAlsoCreateTask,
+    conversionBlockedMessage, sendMessage, onChannelResolved, setAlsoCreateTask, personalContext,
     removeOptimisticMessage,
   ]);
 

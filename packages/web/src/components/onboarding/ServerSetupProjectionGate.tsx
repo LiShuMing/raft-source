@@ -65,6 +65,10 @@ export function isServerSettingsPath(pathname: string, serverSlug: string): bool
   return pathname === base || pathname.startsWith(`${base}/`);
 }
 
+export function isPersonalHomePath(pathname: string, serverSlug: string): boolean {
+  return pathname.replace(/\/$/, "") === `/s/${serverSlug}/personal`;
+}
+
 type ServerSetupProjectionGateProps = {
   serverId: string;
   serverSlug: string;
@@ -351,10 +355,10 @@ export default function ServerSetupProjectionGate({
     void refreshProjection();
   }, [pendingCreateAgentProjection, refreshProjection]);
 
-  // Settings is the setup flow's escape hatch (the footer links here; Delete lives
-  // here), so the blocking modal stays down on it. Every other route still gets
-  // the gate, so this does not reopen a way to skip setup (task #246).
-  if (!dedicatedSurface && isServerSettingsPath(pathname, serverSlug)) return null;
+  // Personal home provides its own empty/setup state. Opening it does not mark
+  // owner setup complete; conversations retain the authoritative setup gate.
+  // Settings remains the existing escape hatch for unfinished workspaces.
+  if (!dedicatedSurface && (isServerSettingsPath(pathname, serverSlug) || isPersonalHomePath(pathname, serverSlug))) return null;
 
   if (!projectionResolved) {
     if (!dedicatedSurface) return null;

@@ -2,9 +2,10 @@ import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "r
 import type { ComponentProps } from "react";
 import { isHostShell } from "../../embed";
 import { useIntl } from "react-intl";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Activity,
+  Bot,
   ArrowUpRight,
   BookOpenText,
   CheckSquare,
@@ -127,6 +128,7 @@ export interface PublicLeftRailProjection {
 }
 
 export function LeftRail({ hidden, topBar = false, publicProjection }: LeftRailProps) {
+  const navigate = useNavigate();
   // Display-language (react-intl) — layout namespace. Rail tab labels feed both
   // raft-ui Tooltip content and `aria-label`, so they must come from the catalog,
   // not literals.
@@ -166,6 +168,9 @@ export function LeftRail({ hidden, topBar = false, publicProjection }: LeftRailP
       )
     : undefined;
   const { railMode, currentMode, selectRailMode } = useRailMode();
+  const location = useLocation();
+  const personalActive = location.pathname.replace(/\/$/, "") === `/s/${server?.slug}/personal`;
+  const openPersonal = useCallback(() => navigate(`/s/${server?.slug}/personal`), [navigate, server?.slug]);
 
   const [showServerMenu, setShowServerMenu] = useState(false);
   const [showHelpMenu, setShowHelpMenu] = useState(false);
@@ -465,8 +470,9 @@ export function LeftRail({ hidden, topBar = false, publicProjection }: LeftRailP
       {/* Rail buttons (middle). Mutually-exclusive — at most one is
           highlighted at a time. */}
       <AppRailNav className="relative w-full">
+        {!isGuest && <RailTabButton icon={<Bot size={18} />} label={formatMessage({ id: "personal.title" })} active={personalActive} onClick={openPersonal} testId="left-rail-personal" />}
         {topBar ? null : <RailTabButton icon={<Search size={18} />} label={formatMessage({ id: "layout.leftRail.tabSearch" })} active={railMode === "search"} onClick={railModeSelectors.search} testId="left-rail-tab-search" />}
-        <RailTabButton icon={<MessageSquare size={18} />} label={formatMessage({ id: "layout.leftRail.tabChat" })} active={railMode === "chat"} onClick={railModeSelectors.chat} showDot={hasChatUnread} dotInactiveOnly testId="left-rail-tab-chat" />
+        <RailTabButton icon={<MessageSquare size={18} />} label={formatMessage({ id: "layout.leftRail.tabChat" })} active={railMode === "chat" && !personalActive} onClick={railModeSelectors.chat} showDot={hasChatUnread} dotInactiveOnly testId="left-rail-tab-chat" />
         <RailTabButton
           icon={<Activity size={18} />}
           label={formatMessage({ id: "layout.leftRail.tabActivity" })}

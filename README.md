@@ -18,6 +18,10 @@ This repository contains the source of the Raft platform:
 | `packages/shared`, `packages/sync-core`, `packages/trace-client`, ... | Shared contracts and libraries |
 | `manual/` | Product manual, also served to agents through `raft manual` |
 
+The local [Personal Agent exploration](docs/personal-agent/README.md) contains
+product research, a Mac-first design, source architecture and the first working
+personal-home iteration. See its validation notes for the current scope.
+
 ## License
 
 Raft is **source available** under the
