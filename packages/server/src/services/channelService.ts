@@ -1,4 +1,5 @@
 import { isStandaloneMode } from "../config/deploymentMode";
+import { resolveEffectiveStandalonePlan } from "../standalone/plan";
 import { revokeSocketAccess } from "../socket/accessRevocation";
 import { createHash, randomInt, randomUUID } from "crypto";
 import { performance } from "node:perf_hooks";
@@ -369,7 +370,7 @@ async function createChannelWithExecutor(
   // ordinary public/private channel quota; they are invite-mediated shared
   // surfaces, not local channels a workspace can freely create.
   const [serverRow] = await executor.select({ plan: servers.plan }).from(servers).where(eq(servers.id, serverId));
-  const plan = (serverRow?.plan as ServerPlan) || "free";
+  const plan = resolveEffectiveStandalonePlan((serverRow?.plan as ServerPlan) || "free");
   const limits = getEffectiveLimits(plan);
   if (type !== "joint" && limits.maxChannels !== -1) {
     const [countRow] = await executor

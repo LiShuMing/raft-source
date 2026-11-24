@@ -13,6 +13,8 @@ import { refreshSubscriptionForServerIfStale } from "./billingService";
 import { assertHumanCapacityAvailable, getServerBillingEntitlement, getServerBillingUsage } from "./planService";
 import { evaluateFeatureFlag, ONBOARDING_OWNER_WIZARD_FEATURE_FLAG_KEY } from "./featureFlagService";
 import { autoInstallOfficialAppsForProvisionedServer } from "./officialAppAutoInstallService";
+import { isStandaloneMode } from "../config/deploymentMode";
+import { resolveEffectiveStandalonePlan, STANDALONE_SERVER_PLAN } from "../standalone/plan";
 import { hasServerCompletedSetupForProjection } from "./serverSetupCompletionService";
 
 export interface SidebarOrderPreferences {
@@ -171,6 +173,7 @@ export async function createServer(name: string, slug: string, ownerId: string) 
       name,
       slug,
       ownerId,
+      ...(isStandaloneMode() ? { plan: STANDALONE_SERVER_PLAN } : {}),
     }).returning();
 
     // Add owner as server member.
@@ -233,10 +236,20 @@ export async function createServer(name: string, slug: string, ownerId: string) 
   });
 }
 
+function normalizeStandaloneServerPlan<T extends { plan: "free" | "founder" | "partner" | "pro"; planDowngradedAt?: Date | null }>(row: T): T {
+  const effectivePlan = resolveEffectiveStandalonePlan(row.plan);
+  if (effectivePlan === row.plan) return row;
+  return {
+    ...row,
+    plan: effectivePlan,
+    ...(Object.prototype.hasOwnProperty.call(row, "planDowngradedAt") ? { planDowngradedAt: null } : {}),
+  };
+}
+
 export async function getServer(serverId: string) {
   const db = getDb();
   const [server] = await db.select().from(servers).where(and(eq(servers.id, serverId), ne(servers.kind, "joint_storage"), isNull(servers.deletedAt)));
-  return server || null;
+  return server ? normalizeStandaloneServerPlan(server) : null;
 }
 
 export async function isOnboardingWizardEnabledForServer(
@@ -263,13 +276,13 @@ export async function isOnboardingWizardEnabledForServer(
 export async function getServerBySlug(slug: string) {
   const db = getDb();
   const [server] = await db.select().from(servers).where(and(eq(servers.slug, slug), ne(servers.kind, "joint_storage"), isNull(servers.deletedAt)));
-  return server || null;
+  return server ? normalizeStandaloneServerPlan(server) : null;
 }
 
 export async function getUserServers(userId: string, opts: { traceQuery?: DbQueryTracer } = {}) {
   const db = getDb();
   const traceQuery = opts.traceQuery ?? untracedDbQuery;
-  return traceQuery(
+  const rows = await traceQuery(
     "servers.memberships_by_user",
     () => db
       .select({
@@ -295,6 +308,7 @@ export async function getUserServers(userId: string, opts: { traceQuery?: DbQuer
       servers_count: rows.length,
     }),
   );
+  return rows.map(normalizeStandaloneServerPlan);
 }
 
 function toStringArray(value: unknown): string[] {

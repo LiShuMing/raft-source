@@ -1,6 +1,7 @@
 import { LocalComputerManager } from "./standalone/localComputer";
 import { createLocalReplicaStateStore } from "./standalone/localReplicaStateStore";
 import { standalonePaths } from "./standalone/config";
+import { ensureStandaloneServerPlans, STANDALONE_SERVER_PLAN } from "./standalone/plan";
 import { isStandaloneMode } from "./config/deploymentMode";
 import { startRaftbenchWorker } from "./raftbench/worker";
 import { getChannelConversionAudienceCutover, applyChannelConversionAudienceRealtimeCutover } from "./services/channelConversionService";
@@ -129,6 +130,13 @@ async function bootstrap() {
   // Initialize PostgreSQL database
   await initDatabase(DATABASE_URL!, DATABASE_URL_READ_REPLICA);
   console.log("[Slock] Database connected");
+
+  if (STANDALONE) {
+    const upgraded = await ensureStandaloneServerPlans();
+    if (upgraded > 0) {
+      console.log(`[Raft standalone] Upgraded ${upgraded} workspace(s) to ${STANDALONE_SERVER_PLAN} plan`);
+    }
+  }
 
   // Initialize Redis (optional — enables multi-replica support)
   const REDIS_URL = process.env.REDIS_URL;

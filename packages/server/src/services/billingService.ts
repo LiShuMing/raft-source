@@ -19,6 +19,7 @@ import {
   type BillingPriceSummary,
   type ServerPlan,
 } from "@botiverse/raft-shared";
+import { resolveEffectiveStandalonePlan } from "../standalone/plan";
 import { getServerBillingEntitlement, getServerBillingUsage } from "./planService";
 import { getWebFrameAncestorOrigins } from "../config/appUrl";
 import { addTraceEvent, traceAttrs } from "../tracing/semanticTrace";
@@ -145,7 +146,7 @@ export async function getBillingSummary(serverId: string) {
   const summary = {
     plan: entitlement.plan,
     displayName: PLAN_CONFIG[entitlement.plan].displayName,
-    serverPlan: server?.plan ?? "free",
+    serverPlan: resolveEffectiveStandalonePlan((server?.plan as ServerPlan | undefined) ?? "free"),
     source: entitlement.source,
     capacity: entitlement.capacity,
     usage,

@@ -80,6 +80,13 @@ would require another persistence implementation and reduce reuse.
 - The launcher removes inherited remote database, Redis, RisingWave, S3,
   ScopeDB, Slack Bridge and mail-provider settings. It disables Stripe billing,
   remote trace export and ECS drain discovery for this isolated profile.
+- Because Stripe billing is disabled in standalone mode, new workspaces start on
+  the unlimited `founder` plan, existing active `free` workspaces are upgraded
+  to `founder` on standalone startup (`planDowngradedAt` cleared), and plan
+  checks promote `free` to `founder` in standalone mode only. This removes the
+  30-day message history cutoff, 100 MB/month upload cap, 50 MB single-file
+  upload limit and Pro feature gates while preserving standard-mode billing
+  behavior.
 
 ## Local Computer connection
 

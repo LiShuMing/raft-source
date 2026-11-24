@@ -3,6 +3,7 @@ import { eq, and, isNull, sql, inArray, ne } from "drizzle-orm";
 import { getDb, type DatabaseExecutor, type DatabaseTransaction } from "../db/index";
 import { isChannelReadOnlyByJointLimit } from "./jointChannelLimitState";
 import { servers, agents, machines, channels, channelHumans, serverMembers, subscriptions } from "../db/schema";
+import { resolveEffectiveStandalonePlan } from "../standalone/plan";
 import {
   PLAN_CONFIG,
   canUseProBillingFeatures,
@@ -52,7 +53,7 @@ export async function getServerPlan(serverId: string): Promise<ServerPlan> {
     .select({ plan: servers.plan })
     .from(servers)
     .where(eq(servers.id, serverId));
-  return (row?.plan as ServerPlan) || "free";
+  return resolveEffectiveStandalonePlan((row?.plan as ServerPlan) || "free");
 }
 
 function isSubscriptionEntitling(status: string): boolean {
@@ -85,7 +86,7 @@ function projectServerBillingEntitlement(
   row: ServerBillingEntitlementRow | undefined,
   now: Date,
 ): ServerBillingEntitlement {
-  const fallbackPlan = (row?.serverPlan as ServerPlan | undefined) ?? "free";
+  const fallbackPlan = resolveEffectiveStandalonePlan((row?.serverPlan as ServerPlan | undefined) ?? "free");
   const hasSubscription = Boolean(row?.subscriptionPlan);
   const hasEntitlingSubscription = Boolean(row?.subscriptionPlan && row.status && isSubscriptionEntitling(row.status));
   const hasInternalEntitlement = isInternalEntitlementPlan(fallbackPlan);
@@ -328,7 +329,7 @@ export async function countMachines(serverId: string): Promise<number> {
  * Returns undefined if unlimited (no filter needed).
  */
 export function getHistoryCutoff(plan: ServerPlan, now: Date = new Date()): Date | undefined {
-  const days = getEffectiveLimits(plan, now).messageHistoryDays;
+  const days = getEffectiveLimits(resolveEffectiveStandalonePlan(plan), now).messageHistoryDays;
   if (days === -1) return undefined;
   const cutoff = new Date(now);
   cutoff.setDate(cutoff.getDate() - days);
