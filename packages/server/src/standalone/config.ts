@@ -17,6 +17,7 @@ export function standalonePaths(env: NodeJS.ProcessEnv = process.env) {
     databaseUrl: `pglite://${path.join(stateDir, "postgres")}`,
     uploadsDir: path.join(stateDir, "uploads"),
     secretFile: path.join(stateDir, "jwt-secret"),
+    providerCredentialKeyFile: path.join(stateDir, "provider-credential-key"),
   };
 }
 
@@ -38,6 +39,26 @@ export async function readOrCreateSigningKey(secretFile: string): Promise<string
   return key;
 }
 
+/** Persist the 32-byte AES-256 key for encrypting stored agent secrets across restarts. */
+export async function readOrCreateProviderCredentialKey(keyFile: string): Promise<string> {
+  await mkdir(path.dirname(keyFile), { recursive: true, mode: 0o700 });
+  const temporary = `${keyFile}.${randomBytes(12).toString("hex")}.tmp`;
+  await writeFile(temporary, randomBytes(32).toString("base64"), { flag: "wx", mode: 0o600 });
+  try {
+    await link(temporary, keyFile);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+  } finally {
+    await unlink(temporary);
+  }
+  const key = (await readFile(keyFile, "utf8")).trim();
+  const decoded = Buffer.from(key, "base64");
+  if (decoded.byteLength !== 32 || decoded.toString("base64").replace(/=+$/u, "") !== key.replace(/=+$/u, "")) {
+    throw new Error(`Invalid provider credential key in ${keyFile}`);
+  }
+  return key;
+}
+
 export async function configureStandalone(env: NodeJS.ProcessEnv = process.env) {
   const config = standalonePaths(env);
   // An isolated profile must never inherit a cloud database or storage target.
@@ -47,6 +68,8 @@ export async function configureStandalone(env: NodeJS.ProcessEnv = process.env) 
   env.APP_URL = config.origin;
   env.CORS_ORIGIN = config.origin;
   env.JWT_SECRET = await readOrCreateSigningKey(config.secretFile);
+  env.SLOCK_PROVIDER_CREDENTIAL_KEY = await readOrCreateProviderCredentialKey(config.providerCredentialKeyFile);
+  delete env.SLOCK_PROVIDER_CREDENTIAL_KEY_PREVIOUS;
   env.UPLOADS_LOCAL = "true";
   env.UPLOADS_DIR = config.uploadsDir;
   env.STRIPE_BILLING_ENABLED = "false";

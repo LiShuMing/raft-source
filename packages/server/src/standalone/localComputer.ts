@@ -32,7 +32,7 @@ export class LocalComputerError extends Error {
 export function localRunnerEnvironment(raftHome: string, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const env = { ...base };
   for (const key of Object.keys(env)) {
-    if (/^(DATABASE_|JWT_|REDIS_|S3_|SCOPEDB_|RESEND_|STRIPE_|SLACK_BRIDGE_|AGENT_API_KEY_HMAC_SECRET$)/.test(key)) delete env[key];
+    if (/^(DATABASE_|JWT_|REDIS_|S3_|SCOPEDB_|RESEND_|STRIPE_|SLACK_BRIDGE_|SLOCK_PROVIDER_CREDENTIAL_KEY|AGENT_API_KEY_HMAC_SECRET$)/.test(key)) delete env[key];
   }
   delete env.NODE_OPTIONS;
   delete env.SLOCK_DAEMON_API_KEY_FILE;
