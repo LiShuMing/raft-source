@@ -284,6 +284,7 @@ export function AgentRuntimeConfigEditor({ agent, runtimeOptions, onClose }: {
         }}
       >
         <RuntimeConfigFields
+          executionComputer={agentMachine}
           runtime={draftRuntime}
           onRuntimeChange={changeDraftRuntime}
           runtimeOptions={runtimePicker.options}

@@ -5,6 +5,7 @@ import { timedArgon2Verify, type Argon2VerifyStats } from "./argon2VerifyStats";
 import { getDb, type DatabaseExecutor } from "../db/index";
 import { agentCredentials, computers, machines, servers, agents, agentMigrations, agentRuntimeProfiles } from "../db/schema";
 import { withServerLock, acquireServerLock } from "./planService";
+import { resolveEffectiveStandalonePlan } from "../standalone/plan";
 import { FencedAuthorizationDeniedError, lockActorMembershipRow } from "../lib/actorMembershipFence";
 import { actorRoleHasServerCapability } from "../lib/actorPermissions";
 import { lockLiveSessionFamily } from "./sessionService";
@@ -134,7 +135,7 @@ export async function registerMachine(
     if (options.webSessionFamilyId) await lockLiveSessionFamily(tx, options.webSessionFamilyId, userId);
     // Check plan quota
     const [serverRow] = await tx.select({ plan: servers.plan }).from(servers).where(eq(servers.id, serverId));
-    const plan = (serverRow?.plan as ServerPlan) || "free";
+    const plan = resolveEffectiveStandalonePlan((serverRow?.plan as ServerPlan) || "free");
     const limits = getEffectiveLimits(plan);
     if (limits.maxMachines !== -1) {
       const [countRow] = await tx.select({ count: sql<number>`count(*)::int` }).from(machines).where(eq(machines.serverId, serverId));

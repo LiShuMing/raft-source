@@ -1,3 +1,8 @@
+import { LocalComputerManager } from "./standalone/localComputer";
+import { createLocalReplicaStateStore } from "./standalone/localReplicaStateStore";
+import { standalonePaths } from "./standalone/config";
+import { ensureStandaloneServerPlans, STANDALONE_SERVER_PLAN } from "./standalone/plan";
+import { isStandaloneMode } from "./config/deploymentMode";
 import { jointDepartureRegistry, configureJointDepartureEffects } from "./services/jointMembershipDeparture";
 import { jointMembershipDepartureEffects } from "./services/jointMembershipDepartureEffects";
 import { configureJointHostSideArchiveEffects, jointHostSideArchiveRegistry } from "./services/jointHostSideArchive";
@@ -215,10 +220,12 @@ try {
   process.exit(1);
 }
 
+const STANDALONE = isStandaloneMode();
+
 // RisingWave is a hard dependency: Activity, followed-thread stats and sidebar
 // unread are served from it only, with no Postgres fallback. A production server
 // without it would fail those reads on every request, so refuse to start.
-if (process.env.NODE_ENV === "production" && !isRisingWaveConfigured()) {
+if (!STANDALONE && process.env.NODE_ENV === "production" && !isRisingWaveConfigured()) {
   console.error("RISINGWAVE_DATABASE_URL environment variable is required in production (RisingWave is a hard dependency)");
   process.exit(1);
 }
@@ -242,6 +249,13 @@ async function bootstrap() {
   // Initialize PostgreSQL database
   await initDatabase(DATABASE_URL!, DATABASE_URL_READ_REPLICA);
   console.log("[Slock] Database connected");
+
+  if (STANDALONE) {
+    const upgraded = await ensureStandaloneServerPlans();
+    if (upgraded > 0) {
+      console.log(`[Raft standalone] Upgraded ${upgraded} workspace(s) to ${STANDALONE_SERVER_PLAN} plan`);
+    }
+  }
 
   // Seed the cross-replica agent-config seal flag before serving traffic so new
   // replicas never send unsealed frames under `strict`, then refresh in the
@@ -351,6 +365,7 @@ async function bootstrap() {
     attachmentUploadSessionService: attachmentUploadSessionService ?? undefined,
     slackBridge,
     serviceInstanceId: traceDeploymentIdentity.serviceInstanceId,
+    standaloneWebDist: STANDALONE ? process.env.RAFT_STANDALONE_WEB_DIST : undefined,
   });
   app.set("slackBridgePrivacyRevalidator", slackBridge?.revalidateChannelPrivacy);
   reportOpsCpuProfileStartup();
@@ -371,8 +386,14 @@ async function bootstrap() {
   app.set("serverTracer", serverTracer.tracer);
 
   // Setup Agent Orchestrator
-  const agentOrchestrator = new AgentOrchestrator(undefined, undefined, serverTracer.tracer);
+  const agentOrchestrator = new AgentOrchestrator(STANDALONE ? createLocalReplicaStateStore() : undefined, undefined, serverTracer.tracer);
   app.set("agentOrchestrator", agentOrchestrator);
+  const localComputerManager = STANDALONE ? new LocalComputerManager({
+    stateDir: standalonePaths().stateDir,
+    origin: standalonePaths().origin,
+    machineStatus: (machineId) => agentOrchestrator.getMachineStatus(machineId),
+  }) : null;
+  if (localComputerManager) app.set("localComputerManager", localComputerManager);
   // Focus: a claim focuses the task for the claimer only when its Computer reads the Focus tag.
   setAgentFocusCapabilityReader((machineId) => agentOrchestrator.machineAdvertisesCapability(machineId, DAEMON_CAPABILITY_AGENT_FOCUS_V1));
   setProductFeedbackTriageNoticeDeliverer(agentOrchestrator);
@@ -468,15 +489,15 @@ async function bootstrap() {
   // Onboarding wakes held for a per-turn runtime driver go once its process is idle.
   startOnboardingHeldWakeRelease({ orchestrator: agentOrchestrator });
   // Hosted Cindy is briefed when her workspace import lands, not on machine:online.
-  registerHostedCindyTriggers({ io, orchestrator: agentOrchestrator, trigger: triggerOwnerOnboardingOnAgentActivation, tracer: serverTracer.tracer });
+  if (!STANDALONE) registerHostedCindyTriggers({ io, orchestrator: agentOrchestrator, trigger: triggerOwnerOnboardingOnAgentActivation, tracer: serverTracer.tracer });
   // A hosted Cindy has no computer to fire her Day-2 recap; the server does.
-  const hostedCindyRecapWorker = startHostedCindyRecapWorker({ io, orchestrator: agentOrchestrator, tracer: serverTracer.tracer });
+  const hostedCindyRecapWorker = STANDALONE ? { stop: () => {} } : startHostedCindyRecapWorker({ io, orchestrator: agentOrchestrator, tracer: serverTracer.tracer });
   // Yesterday's hosted spend, per agent and for the onboarding budget, as trace events for the daily report.
-  const hostedRuntimeDailySpendWorker = startHostedRuntimeDailySpendWorker({ tracer: serverTracer.tracer });
+  const hostedRuntimeDailySpendWorker = STANDALONE ? { stop: () => {} } : startHostedRuntimeDailySpendWorker({ tracer: serverTracer.tracer });
   // New-server onboarding funnel (T3): aggregates to otel.logs every 6 hours, plus the one
   // milestone no table kept, a Computer's first connection.
   startMachineFirstConnectRecorder({ orchestrator: agentOrchestrator });
-  const onboardingFunnelWorker = startOnboardingFunnelWorker({ tracer: serverTracer.tracer });
+  const onboardingFunnelWorker = STANDALONE ? { stop: () => {} } : startOnboardingFunnelWorker({ tracer: serverTracer.tracer });
 
   // Hourly maintenance — downgrade enforcement + webhook event cleanup
   const runMaintenance = () => {
@@ -812,7 +833,7 @@ async function bootstrap() {
   // sweep over this replica's connected computers. Off by default: it runs only with
   // THIRD_PARTY_EVENT_REDELIVERY_SWEEP_ENABLED=true (and not THIRD_PARTY_EVENT_REDELIVERY_ENABLED=false).
   const thirdPartyEventRedeliveryWorker = startThirdPartyEventRedeliveryWorker({ agentOrchestrator });
-  const raftbenchWorker = startRaftbenchWorker(agentOrchestrator);
+  const raftbenchWorker = STANDALONE ? { stop: () => {} } : startRaftbenchWorker(agentOrchestrator);
   const assistantDoorbellWorker = startAssistantDoorbellWorker({ agentOrchestrator, tracer: serverTracer.tracer });
   // The personal assistant's WeChat bridge: one long poll per active binding
   // across replicas (a lease per binding), mirroring WeChat-turn replies back.
@@ -836,7 +857,7 @@ async function bootstrap() {
     io,
     orchestrator: agentOrchestrator,
   });
-  const hostedAgentMigrationImporterWorker = startHostedAgentMigrationImporterWorker({ io, orchestrator: agentOrchestrator });
+  const hostedAgentMigrationImporterWorker = STANDALONE ? { stop: () => {} } : startHostedAgentMigrationImporterWorker({ io, orchestrator: agentOrchestrator });
   // RFC 073: recover durable tasks whose inline run was lost. Off unless DURABLE_TASKS_ENABLED=true.
   const durableTaskRecovery = startDurableTaskRecovery({ registry: durableTaskRegistry, tracer: serverTracer.tracer });
   configureJointDepartureEffects(jointMembershipDepartureEffects(agentOrchestrator));
@@ -862,22 +883,31 @@ async function bootstrap() {
   // Marketplace review decisions (App Admin's): agent:deleted and the credential revocation
   // signal for removed bots, permission-updates:changed; every 5 s, oldest-age gauge alongside.
   const marketplaceReviewOutboxWorker = startMarketplaceReviewOutboxWorker({ sinks: marketplaceReviewSinks, tracer: serverTracer.tracer });
-  const agentRuntimeProvisionWorker = startAgentRuntimeProvisionWorker({ tracer: serverTracer.tracer });
+  const agentRuntimeProvisionWorker = STANDALONE ? { stop: () => {} } : startAgentRuntimeProvisionWorker({ tracer: serverTracer.tracer });
   // antiproton held-call approvals: the reconcile of each configured target (none: idle).
   const agentRuntimeApprovalWorker = startAgentRuntimeApprovalWorker({ io });
 
   // Start Prometheus metrics endpoint
-  startMetricsServer();
+  if (!STANDALONE) startMetricsServer();
 
   // Open a few primary PG connections before the load balancer can route
   // here, so a deploy's reconnect storm does not find an empty pool. Bounded
   // and never throws; see db/poolPrewarm.ts.
   await prewarmPrimaryPool();
 
-  // Start server
+  // Start server. Standalone defaults to loopback; `RAFT_STANDALONE_HOST` lets a
+  // container publish it (a Docker port mapping forwards to the container's
+  // interface, not its loopback), so the operator opts in explicitly instead of
+  // the profile widening its own bind. Unset keeps the previous behaviour.
+  const listenHost = STANDALONE
+    ? (process.env.RAFT_STANDALONE_HOST?.trim() || "127.0.0.1")
+    : "0.0.0.0";
   trackHttpServer(server);
-  server.listen(PORT, () => {
+  server.listen(PORT, listenHost, () => {
     slackBridge?.start();
+    void localComputerManager?.resume().catch(() => {
+      console.warn("[Raft standalone] Could not resume local Computers");
+    });
     console.log(`[Slock] Server listening on http://localhost:${PORT}`);
     serverTracer.tracer.emitEvent("slock.server.started", { surface: "server" });
     const cpuProfileSampler = cpuProfileSummaryEnabled(process.env, traceDeploymentIdentity.serviceInstanceId)
@@ -1153,7 +1183,7 @@ async function bootstrap() {
           resolve();
         });
       }),
-      settleWorkers: () => provisionWorkerStopped,
+      settleWorkers: () => Promise.all([provisionWorkerStopped, localComputerManager?.stop()]).then(() => undefined),
       releaseMachineOwnership: async () => {
         const [orchestratorResult, slackBridgeResult] = await Promise.allSettled([
           agentOrchestrator.shutdown(),

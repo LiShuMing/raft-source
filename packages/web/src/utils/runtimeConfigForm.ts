@@ -20,7 +20,7 @@ import type {
   RuntimeModeConfig,
 } from "@botiverse/raft-shared";
 
-export type RuntimeProviderMode = "default" | "custom";
+export type RuntimeProviderMode = "machine" | "default" | "custom";
 
 /** Stable codes for UI localization; `message` remains English for logs/tests. */
 export type RuntimeConfigBuildErrorCode =
@@ -97,6 +97,11 @@ export function runtimeConfigCustomModelName(config: RuntimeConfig): string {
 
 export function runtimeConfigApiUrl(config: RuntimeConfig): string {
   return config.provider?.kind === "custom" ? config.provider.apiUrl : "";
+}
+
+export function runtimeConfigProviderMode(config: RuntimeConfig): RuntimeProviderMode {
+  if (config.runtime === "claude" && config.model.kind === "machine") return "machine";
+  return config.provider?.kind === "custom" ? "custom" : "default";
 }
 
 /** Fast mode as it launches: a saved fast mode on a model that no longer runs fast launches at the standard speed. */
@@ -201,11 +206,15 @@ export function buildRuntimeConfig(input: {
             : { kind: "default" as const },
         }
       : {}),
-    model: isBuiltInGateway || input.customModelMode
+    model: (runtime === "opencode" || (runtime === "pi" && !isPiBuiltin))
+      ? { kind: "preset", id: "default" }
+      : runtime === "claude" && providerMode === "machine"
+      ? { kind: "machine" }
+      : isBuiltInGateway || input.customModelMode
       ? { kind: "custom", name: modelId }
       : { kind: "preset", id: modelId },
-    mode,
-    reasoningEffort: input.reasoningEffort ?? null,
+    mode: runtime === "claude" && providerMode === "machine" ? { kind: "default" } : mode,
+    reasoningEffort: (runtime === "claude" && providerMode === "machine") || (runtime === "pi" && !isPiBuiltin) || runtime === "opencode" ? null : input.reasoningEffort ?? null,
     envVars: input.envVars ?? null,
     ...(supportsRuntimeCommand(runtime) && input.command?.trim()
       ? { command: input.command.trim() }

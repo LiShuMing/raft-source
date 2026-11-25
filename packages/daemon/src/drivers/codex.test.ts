@@ -43,6 +43,15 @@ const codexConfig = {
   authToken: "sk_machine_test",
 };
 
+test("standalone Codex launch disables analytics, feedback and trace export explicitly", () => {
+  const args = buildCodexAppServerArgs(null, true);
+  assert.deepEqual(args, [
+    "app-server", "-c", "analytics.enabled=false", "-c", "feedback.enabled=false",
+    "-c", 'otel.exporter="none"', "--listen", "stdio://",
+  ]);
+  assert.deepEqual(buildCodexAppServerArgs(), ["app-server", "--listen", "stdio://"]);
+});
+
 test("codex app-server gets the managed MCP endpoint without its token: the token is read from its own environment", () => {
   const args = buildCodexAppServerArgs({ name: "raft_managed", endpointUrl: "http://127.0.0.1:43123/mcp" });
   assert.deepEqual(args, [

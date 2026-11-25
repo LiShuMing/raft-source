@@ -1,3 +1,4 @@
+import { assertClaudeMachineSettingsSupported } from "./claudeMachineSettings";
 import { LocalAgentInboxes } from "./localAgentInboxes";
 import { assertNoEncryptedAgentSecrets, openAgentRowSecrets, openAgentRowSecretsIsolated } from "./agentSecretCrypto";
 import { getReplicaAgentConfigSealModeSync } from "./agentSecretFlags";
@@ -17458,6 +17459,10 @@ export class AgentOrchestrator extends EventEmitter {
 
     const openedAgent = openAgentRowSecrets(agent);
     const normalizedRuntimeConfig = hydrateRuntimeConfig(openedAgent);
+    if (normalizedRuntimeConfig.model.kind === "machine") {
+      const carrier = await this.readProbeCarrierFact(agent.machineId);
+      assertClaudeMachineSettingsSupported(normalizedRuntimeConfig, carrier?.capabilities ?? []);
+    }
     if (isBuiltInRuntimeConfigMissingProvider(normalizedRuntimeConfig)) {
       this.recordLifecycleEvent({
         agentId,
@@ -19748,7 +19753,7 @@ export class AgentOrchestrator extends EventEmitter {
   > {
     const selection = builtInCatalogSelection(config);
     if (!selection) return null;
-    const requestedModel = selection.model.kind === "preset" ? selection.model.id : selection.model.name;
+    const requestedModel = selection.model.kind === "preset" ? selection.model.id : selection.model.kind === "custom" ? selection.model.name : "";
     let detection: MachineRuntimeModelDetection;
     try {
       detection = await this.detectMachineRuntimeModelsWithAuthority(

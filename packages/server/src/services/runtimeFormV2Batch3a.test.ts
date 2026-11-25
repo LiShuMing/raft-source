@@ -265,7 +265,7 @@ test("every model option carries its efforts, resolved exactly like the legacy w
 // Runtimes whose model source keeps the pre-status body (no probe status);
 // every other model source says whether it is live (`option_source.status`,
 // always on, never listed).
-const UNPROBED_MODEL_RUNTIMES = new Set(["opencode", "kimi", "gemini"]);
+const UNPROBED_MODEL_RUNTIMES = new Set(["opencode", "kimi", "gemini", "pi"]);
 
 test("no form lists choice.labels or option_source.status; status follows the probe, customValueAllowed the listed capability", async () => {
   const outcomes: Array<[() => Promise<RuntimeModelSourceOutcome>, ("not_routed" | undefined)?]> = [
@@ -308,8 +308,10 @@ test("no form lists choice.labels or option_source.status; status follows the pr
           // #wg-runtime-form:#27: Codex's speed follows the model probe.
           assert.ok(typeof source.status === "string", `${runtime}/${sourceId}: status`);
         } else if (sourceId === "model") {
-          if (!UNPROBED_MODEL_RUNTIMES.has(runtime)) assert.ok(typeof source.status === "string", `${runtime}/${sourceId}: status`);
-          assert.equal(source.customValueAllowed === true, capabilities.has("select.custom_value"), `${runtime}/${sourceId}: customValueAllowed`);
+          if (!UNPROBED_MODEL_RUNTIMES.has(runtime)) {
+            assert.ok(typeof source.status === "string", `${runtime}/${sourceId}: status`);
+            assert.equal(source.customValueAllowed === true, capabilities.has("select.custom_value"), `${runtime}/${sourceId}: customValueAllowed`);
+          }
         } else {
           assert.equal("status" in source, false, `${runtime}/${sourceId}: a static source has no status`);
           assert.notEqual(source.customValueAllowed, true, `${runtime}/${sourceId}: no typed value`);

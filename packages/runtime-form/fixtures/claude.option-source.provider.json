@@ -1,20 +1,24 @@
 {
   "protocolVersion": 1,
   "runtimeId": "claude",
-  "schemaVersion": "claude.create.v1",
+  "schemaVersion": "claude.create.v2",
   "sourceId": "provider",
   "kind": "select",
   "pointer": "/provider",
   "options": [
     {
+      "value": "machine",
+      "label": "Machine settings"
+    },
+    {
       "value": "default",
-      "label": "Default"
+      "label": "Override model"
     },
     {
       "value": "custom",
-      "label": "Custom"
+      "label": "Custom connection"
     }
   ],
-  "defaultValue": "default",
+  "defaultValue": "machine",
   "customValueAllowed": false
 }

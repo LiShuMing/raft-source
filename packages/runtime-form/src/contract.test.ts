@@ -140,7 +140,7 @@ test("a malformed requiredClientCapabilities fails closed as a capability no cli
 // every served form and option source conforms to the contract, parses
 // without blocking fields, and needs no client capability.
 const BATCH_2_FORMS = ["opencode.form.json", "opencode.edit.json", "kimi.edit.json", "gemini.edit.json"];
-const BATCH_2_OPTION_SOURCES = ["opencode.option-source.fallback.json", "kimi.option-source.fallback.json", "gemini.option-source.json"];
+const BATCH_2_OPTION_SOURCES = ["kimi.option-source.fallback.json", "gemini.option-source.json"];
 const fixture = (name: string) => JSON.parse(readFileSync(`${ROOT}fixtures/${name}`, "utf8")) as Record<string, unknown>;
 
 test("batch 2 fixtures conform to the contract and render with the base renderer", () => {
@@ -154,6 +154,7 @@ test("batch 2 fixtures conform to the contract and render with the base renderer
     assert.ok(parsed.fields.every((field) => field.kind === "select" || field.kind === "string_map"), name);
     assert.ok(parsed.values && typeof parsed.values === "object" || name.endsWith(".form.json"), name);
   }
+  assert.equal(fixture("opencode.option-source.fallback.json"), null);
   for (const name of BATCH_2_OPTION_SOURCES) {
     const body = fixture(name);
     assert.equal(violation(body, { $ref: "#/$defs/OptionSource" }, name), null);

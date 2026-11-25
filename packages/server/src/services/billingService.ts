@@ -1,3 +1,4 @@
+import { resolveEffectiveStandalonePlan } from "../standalone/plan";
 import { CheckoutPromotionUnavailableError, normalizeCheckoutPromotionCode, resolveCheckoutPromotion } from "./checkoutPromotion";
 import Stripe from "stripe";
 import { getActiveAppSumoGrant, hasAppSumoBillingReservation } from "./appSumoLicenseService";
@@ -214,7 +215,7 @@ export async function getBillingSummary(serverId: string) {
     appsumoBillingReserved,
     plan: entitlement.plan,
     displayName: PLAN_CONFIG[entitlement.plan].displayName,
-    serverPlan: server?.plan ?? "free",
+    serverPlan: resolveEffectiveStandalonePlan((server?.plan as ServerPlan | undefined) ?? "free"),
     source: entitlement.source,
     sourceConflict,
     capacity: entitlement.capacity,

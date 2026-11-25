@@ -5,8 +5,10 @@ import { useIntl } from "react-intl";
 import type { ComputerCommandPlatform } from "../../utils/computerSetupCommand";
 import SectionEyebrow from "../ui/SectionEyebrow";
 import { CommandRow } from "./CommandRow";
+import StandaloneComputerConnect from "./StandaloneComputerConnect";
 
 interface ComputerCommandGuideProps {
+  localServerId?: string | null;
   computerCommand: string | null;
   computerInstallCommand: string | null;
   // When set, mac/Linux shows this single install-then-setup command instead
@@ -100,7 +102,12 @@ function CommandRows({
   );
 }
 
-export default function ComputerCommandGuide({
+export default function ComputerCommandGuide(props: ComputerCommandGuideProps) {
+  if (props.localServerId) return <StandaloneComputerConnect key={props.localServerId} serverId={props.localServerId} />;
+  return <RemoteComputerCommandGuide {...props} />;
+}
+
+function RemoteComputerCommandGuide({
   computerCommand,
   computerInstallCommand,
   computerInstallAndSetupCommand = null,

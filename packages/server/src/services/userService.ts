@@ -1,3 +1,4 @@
+import { isStandaloneMode } from "../config/deploymentMode";
 import { revokeSocketAccess } from "../socket/accessRevocation";
 import { serializeErrorForLog } from "../tracing/safeErrorLog";
 import { eq, and, asc, gt, isNull, sql } from "drizzle-orm";
@@ -391,7 +392,10 @@ export async function createUser(
 
   const passwordHash = await argon2.hash(password);
 
-  const token = randomBytes(32).toString("hex");
+  // Standalone identities are local to this database. Mailbox ownership is not
+  // required; keep the shared authorization gate satisfied without sending mail.
+  const localAccount = isStandaloneMode();
+  const token = localAccount ? null : randomBytes(32).toString("hex");
 
   let publicUser: PublicUser;
   try {
@@ -408,6 +412,7 @@ export async function createUser(
         displayName: options.deferProfileSetup ? null : name,
         // Email sign-up joins no server yet: no avatar (newAccountAvatarUrlFor).
         passwordHash,
+        emailVerified: localAccount,
         passwordCredentialEstablishedAt: currentDate(),
         profileSetupCompletedAt: options.deferProfileSetup ? null : currentDate(),
         profileSetupSuggestedHandle: suggestedHandle,
@@ -419,11 +424,13 @@ export async function createUser(
       }).returning();
 
       await legalAcceptanceService.insertUserLegalAcceptance(transaction, user.id, legalSource, legalMetadata, accepted);
-      await transaction.insert(emailVerifications).values({
-        userId: user.id,
-        tokenHash: hashToken(token),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h
-      });
+      if (token) {
+        await transaction.insert(emailVerifications).values({
+          userId: user.id,
+          tokenHash: hashToken(token),
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h
+        });
+      }
 
       return toPublicUser(user);
     });
@@ -438,12 +445,14 @@ export async function createUser(
   // must not turn a created account into "Registration failed" (the retry then
   // says "already registered"). The user lands on the verify-email screen and
   // can resend from there (task #55).
-  try {
-    await sendVerificationEmail(normalizedEmail, options.deferProfileSetup ? "there" : name!, token, options.verificationReturnTo);
-    options.onVerificationEmail?.("sent");
-  } catch (err) {
-    console.error("[userService] Verification email failed after account creation:", serializeErrorForLog(err));
-    options.onVerificationEmail?.("failed");
+  if (token) {
+    try {
+      await sendVerificationEmail(normalizedEmail, options.deferProfileSetup ? "there" : name!, token, options.verificationReturnTo);
+      options.onVerificationEmail?.("sent");
+    } catch (err) {
+      console.error("[userService] Verification email failed after account creation:", serializeErrorForLog(err));
+      options.onVerificationEmail?.("failed");
+    }
   }
 
   if (!options.deferProfileSetup) {
@@ -502,7 +511,16 @@ async function finishPasswordSignInLocked(
     [linked] = await tx.select().from(users).where(eq(users.id, current.id));
   }
   await healPasswordCredentialMarker(tx, current);
-  return { ...(await signInLocked(tx, linked ?? current, proof)), afterCommit };
+  // Recover accounts created before standalone onboarding was available.
+  // Only accept them after password proof AND locked credential revalidation.
+  // Never bulk-verify accounts or trust a client-supplied deployment mode.
+  let localUser: LockedPasswordUser | undefined;
+  if (isStandaloneMode() && !(linked ?? current).emailVerified) {
+    [localUser] = await tx.update(users).set({ emailVerified: true, updatedAt: currentDate() })
+      .where(eq(users.id, current.id)).returning();
+    await tx.delete(emailVerifications).where(eq(emailVerifications.userId, current.id));
+  }
+  return { ...(await signInLocked(tx, localUser ?? linked ?? current, proof)), afterCommit };
 }
 
 /** The session and the public account a sign-in answers with, for the person's locked row. */

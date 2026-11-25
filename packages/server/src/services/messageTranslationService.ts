@@ -1,3 +1,5 @@
+import { isStandaloneMode } from "../config/deploymentMode";
+import { requireExternalService } from "../config/privacyPolicy";
 import { createHash } from "node:crypto";
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -245,6 +247,7 @@ export function resolveProviderFromEnv(): ResolvedTranslationProvider {
 }
 
 export function isTranslationProviderConfigured(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (isStandaloneMode(env)) return false;
   if (env.TRANSLATION_SSM_ENVIRONMENT?.trim()) return false;
   const configuredProvider = env.TRANSLATION_PROVIDER?.trim().toLowerCase();
   if (configuredProvider === "fake") {
@@ -636,6 +639,7 @@ export async function translateMessagesBatch(input: {
   mode: TranslationMode;
   messageIds: string[];
 }): Promise<MessageTranslationBatchResult[]> {
+  requireExternalService("Message translation");
   const visible = await listVisibleMessages(input);
   // A message behind the plan's history window is not this reader's to see,
   // so not to translate either: it answers like a message that isn't there.
@@ -660,6 +664,7 @@ export async function translatePublicMessagesBatch(input: {
   mode: TranslationMode;
   messageIds: string[];
 }): Promise<MessageTranslationBatchResult[]> {
+  requireExternalService("Message translation");
   const db = getDb();
   const uniqueIds = [...new Set(input.messageIds)];
   if (uniqueIds.length === 0) return [];

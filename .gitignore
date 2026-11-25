@@ -50,3 +50,6 @@ coverage/
 # apps/desktop/scripts/fetch-computer-installer.mjs from the pin in
 # apps/desktop/build/computer-installer.json (which is committed).
 apps/desktop/build/computer-installer/
+
+# Single-machine state when explicitly placed inside this checkout.
+/.raft-standalone/

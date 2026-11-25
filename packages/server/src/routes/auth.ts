@@ -1,3 +1,4 @@
+import { getDeploymentMode, isStandaloneMode } from "../config/deploymentMode";
 import { serializeErrorForLog } from "../tracing/safeErrorLog";
 import {
   completionBindingCookie,
@@ -930,6 +931,12 @@ authRouter.get("/providers", async (req, res) => {
     return;
   }
 
+  if (isStandaloneMode()) {
+    const deploymentUserLimitReached = await isDeploymentUserLimitReached().catch(() => false);
+    res.json({ providers: [], sso: false, deploymentUserLimitReached, deploymentMode: "standalone" });
+    return;
+  }
+
   const providerConfigs = ["google", "github", "apple"]
     .map((providerId) => getSocialAuthProvider(providerId))
     .filter((provider): provider is NonNullable<typeof provider> => !!provider);
@@ -946,7 +953,7 @@ authRouter.get("/providers", async (req, res) => {
   // License allows. Signing up still works; joining is what is refused.
   const deploymentUserLimitReached = await isDeploymentUserLimitReached().catch(() => false);
 
-  res.json({ providers, sso, deploymentUserLimitReached });
+  res.json({ providers, sso, deploymentUserLimitReached, deploymentMode: getDeploymentMode() });
 });
 
 authRouter.get("/identities", requireAuth, async (req, res) => {

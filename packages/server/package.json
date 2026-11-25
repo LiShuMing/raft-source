@@ -119,7 +119,8 @@
     "test:artifact-publish-real-pg": "ARTIFACT_PUBLISH_REAL_PG_REQUIRED=1 vitest run src/apps/artifacts/publish.realPg.test.ts",
     "test:notification-outbox-fk-indexes-real-pg": "NOTIFICATION_OUTBOX_FK_INDEXES_REAL_PG_REQUIRED=1 vitest run src/db/notificationOutboxFkIndexes.realPg.test.ts",
     "test:mcp-default-mirror": "MCP_DEFAULT_MIRROR_REAL_PG_REQUIRED=1 vitest run src/db/managedMcpDefaultMirror.realPg.test.ts",
-    "ops:rw-joint-member-parity": "node --import @oxc-node/core/register scripts/rw-joint-member-parity.ts"
+    "ops:rw-joint-member-parity": "node --import @oxc-node/core/register scripts/rw-joint-member-parity.ts",
+    "standalone": "node --import @oxc-node/core/register src/standalone.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.129.0",
@@ -159,6 +160,7 @@
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.5.0",
     "openid-client": "6.8.9",
+    "parse5": "8.0.1",
     "pg": "^8.20.0",
     "prom-client": "^15.1.3",
     "resend": "^6.10.0",

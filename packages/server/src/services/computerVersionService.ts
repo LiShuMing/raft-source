@@ -23,6 +23,7 @@ import {
   normalizeComputerReleaseNotes,
 } from "@botiverse/raft-shared";
 import type { ComputerReleaseNotes } from "@botiverse/raft-shared";
+import { isStandaloneMode } from "../config/deploymentMode";
 import { isPrivacyModeOn } from "../config/privacyMode";
 
 let cachedLatestComputerVersion: string | null = null;
@@ -41,6 +42,7 @@ const HANDS_LATEST_BUILD_URL =
   "https://hands.build/public/v2/apps/raft-computer-cli/latest?channel=main";
 
 export function getLatestComputerVersion(): Promise<string | null> {
+  if (isStandaloneMode()) return Promise.resolve(null);
   // RAFT_PRIVACY_MODE: no update check against hands.build; unknown, as when
   // Hands cannot be reached. A manual pinned upgrade on the Computer still works.
   if (isPrivacyModeOn()) return Promise.resolve(null);
@@ -99,6 +101,7 @@ async function fetchLatestComputerReleaseNotes(): Promise<void> {
 
 /** Cached notes for exactly the cached latest version; null otherwise. Never fetches. */
 export function getLatestComputerReleaseNotes(): ComputerReleaseNotes | null {
+  if (isStandaloneMode()) return null;
   const notes = cachedLatestComputerReleaseNotes;
   if (!notes || !cachedLatestComputerVersion) return null;
   return notes.version === cachedLatestComputerVersion ? notes : null;

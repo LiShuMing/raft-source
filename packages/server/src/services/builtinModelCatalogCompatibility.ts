@@ -97,6 +97,7 @@ export function builtInCatalogSelection(config: RuntimeConfig): BuiltInCatalogSe
   if (isBuiltInRuntimeConfigMissingProvider(config)) return null;
   const { provider, model } = config;
   if (provider.kind === "preset") {
+    if (model.kind === "machine") return null;
     if (model.kind !== "preset" && !isBuiltInRuntimeCustomModelPresetProviderId(provider.providerId)) return null;
     return {
       providerId: provider.providerId,
@@ -182,7 +183,7 @@ export function assertBuiltInPresetSupportedByCatalog(
   const selection = builtInCatalogSelection(config);
   if (!selection) return null;
 
-  const requestedModel = selection.model.kind === "preset" ? selection.model.id : selection.model.name;
+  const requestedModel = selection.model.kind === "preset" ? selection.model.id : selection.model.kind === "custom" ? selection.model.name : "";
   const catalog = requireBuiltInCatalogCapability(
     outcome,
     target,

@@ -1,6 +1,7 @@
 import type { TurnEndCompactionDriverOutcome, TurnEndContextFacts } from "../turnEndCompaction";
 import { ProviderApiKeyInvalidError, RuntimeModelNotFoundError } from "../spawnFailureErrors";
-import { withProcessEnvPatch } from "../processEnvPatch";
+import { ambientProcessEnv, withProcessEnvPatch } from "../processEnvPatch";
+import { readPiHostEnv, resolvePiAgentDir, piHostDefaultModel } from "./piHostConfig";
 import type { ProviderRequestObserver } from "../providerRequestFetch";
 import { PiRequestLog } from "../agentContextView/piRequestLog";
 import { PiProviderCallTracker } from "./piProviderCallTracker";
@@ -1231,11 +1232,13 @@ export async function detectPiModels(
     return detectPiModelsFromRegistry(modelRegistry);
   }
 
-  const agentDir = getAgentDir();
-  const services = await createAgentSessionServices({
+  const env = ambientProcessEnv();
+  const hostEnv = readPiHostEnv(env);
+  const agentDir = resolvePiAgentDir({ ...hostEnv, ...env }, getAgentDir());
+  const services = await withProcessEnvPatch(hostEnv, () => createAgentSessionServices({
     cwd: process.cwd(),
     agentDir,
-  });
+  }));
   const detectedModelRegistry = new ModelRegistry(services.modelRuntime);
   logPiServiceDiagnostics("detect_models", services);
   addPiServiceTraceEvent(traceContext.span, "daemon.pi.models.services_ready", services);
@@ -2066,6 +2069,7 @@ function installProviderHttpClient(
   anthropicRequests?: PiAnthropicRequestMeter,
   /** Throws when the model must not be called (a Built-in model off its provider's endpoint). */
   assertModelTransport?: (model: Parameters<ModelRuntime["stream"]>[0]) => void,
+  nativeEnv?: Record<string, string>,
 ): void {
   const fetchForModel = (model: Parameters<ModelRuntime["stream"]>[0]) => {
     assertModelTransport?.(model);
@@ -2078,6 +2082,7 @@ function installProviderHttpClient(
   modelRuntime.stream = ((model, context, options) => {
     const providerOptions = {
       ...recordingRequests(requestLog, model, options),
+      ...(nativeEnv ? { env: { ...nativeEnv, ...options?.env } } : {}),
       fetch: fetchForModel(model),
     } as typeof options;
     const call = (callOptions: typeof options) => providerCallTracker
@@ -2090,6 +2095,7 @@ function installProviderHttpClient(
   modelRuntime.streamSimple = ((model, context, options) => {
     const providerOptions = {
       ...recordingRequests(requestLog, model, options),
+      ...(nativeEnv ? { env: { ...nativeEnv, ...options?.env } } : {}),
       fetch: fetchForModel(model),
     };
     const call = (callOptions: typeof providerOptions) => providerCallTracker
@@ -2184,7 +2190,8 @@ export async function openPiAgentSessionForContext(
   let liveSessionId: string | null = null;
   try {
     const spawnEnv = await buildPiSpawnEnv(ctx);
-    const agentDir = opts.agentDir ?? spawnEnv.PI_CODING_AGENT_DIR ?? getAgentDir();
+    const hostEnv = runtimeConfig.runtime === "pi" ? readPiHostEnv(spawnEnv) : {};
+    const agentDir = opts.agentDir ?? resolvePiAgentDir({ ...hostEnv, ...spawnEnv }, getAgentDir());
     mkdirSync(agentDir, { recursive: true });
     const builtIn = runtimeConfig.runtime === "builtin";
     // No code or installs from the workspace; Built-in takes no credentials or
@@ -2193,7 +2200,7 @@ export async function openPiAgentSessionForContext(
       ? createBuiltInSettingsManager(ctx.workingDirectory, agentDir)
       : createPiRuntimeSettingsManager(ctx.workingDirectory, agentDir);
     const providerEnvScope = opts.isolateHostProviderEnv ? BUILTIN_BLOCKED_HOST_PROVIDER_ENV_KEYS : undefined;
-    const sessionCreateEnvPatch = buildPiSessionCreateEnvPatch(runtimeConfig, launchRuntimeFields.envVars);
+    const sessionCreateEnvPatch = buildPiSessionCreateEnvPatch(runtimeConfig, { ...hostEnv, ...launchRuntimeFields.envVars });
     // The session loads no extension from its package manager (noExtensions):
     // host extensions come in as explicit paths, resolved without the
     // workspace. Built-in takes them only when its owner opted in, and never
@@ -2286,7 +2293,8 @@ export async function openPiAgentSessionForContext(
             sessionId: () => liveSessionId,
           } : undefined,
           anthropicRequests,
-          assertModelTransport);
+          assertModelTransport,
+          runtimeConfig.runtime === "pi" ? { ...hostEnv, ...launchRuntimeFields.envVars } : undefined);
         // Request-time credentials and proxy routing must be session-local.
         // Holding a process.env patch across an async SDK turn serializes every
         // Pi agent in this runner. The short create-time scope also keeps
@@ -2350,7 +2358,9 @@ export async function openPiAgentSessionForContext(
       ...launchTraceEvidenceAttrs,
     });
     const savedModel = resolvePiModelFromRegistry(
-      launchRuntimeFields.model,
+      runtimeConfig.runtime === "pi"
+        ? piHostDefaultModel(launchRuntimeFields.model, { ...hostEnv, ...spawnEnv }, services.settingsManager, modelRegistry.getAll(), path.join(agentDir, "models.json"))
+        : launchRuntimeFields.model,
       modelRegistry,
       runtimeConfig,
     );
@@ -2448,7 +2458,9 @@ export async function openPiAgentSessionForContext(
       }),
       ...managedMcpTools,
     ];
-    const thinkingLevel = resolveBuiltInThinkingLevel(launchRuntimeFields.reasoningEffort, gatewayRegistration.thinkingContract);
+    const thinkingLevel = runtimeConfig.runtime === "pi" && !launchRuntimeFields.reasoningEffort
+      ? undefined
+      : resolveBuiltInThinkingLevel(launchRuntimeFields.reasoningEffort, gatewayRegistration.thinkingContract);
     // A value Raft had to default is only a web warning for humans; the agent
     // is told in its system prompt how to declare the real one (models.json).
     const modelLimitsNote = registeredModelLimits && model

@@ -1,3 +1,4 @@
+import { isStandaloneMode } from "../config/deploymentMode";
 import path from "node:path";
 import fs from "node:fs";
 import { randomUUID } from "node:crypto";
@@ -1409,6 +1410,11 @@ export function resolvePublicContentStorageConfig(env: NodeJS.ProcessEnv = proce
 export function getPublicContentStorage(): StorageBackend | null {
   if (_publicContentStorageResolved) return _publicContentStorage;
   _publicContentStorageResolved = true;
+
+  if (isStandaloneMode()) {
+    _publicContentStorage = new LocalStorage(path.resolve(process.env.UPLOADS_DIR || path.join(process.cwd(), "uploads")));
+    return _publicContentStorage;
+  }
 
   const config = resolvePublicContentStorageConfig();
   if (config.kind === "disabled") return null;

@@ -1,3 +1,5 @@
+import { localComputerRouter } from "../standalone/localComputerRoutes";
+import { remoteComputerRouter } from "../standalone/remoteComputerRoutes";
 import { computerAttentionForViewer, computerReadinessForViewer, loadComputerReadinessInputs, loadMemberDisplayNames, loadReadinessAgentsByMachine, readinessAgentOwnerUserId, readinessViewerForRole, type ReadinessOwnedAgent } from "../services/runtimeReadinessService";
 import { objectActivityUnreadBatch } from "../services/objectActivity";
 import { hideUnfindableAgentsByParam } from "./unfindableAgentGate";
@@ -5818,3 +5820,7 @@ serverRouter.patch("/:id/public-search", async (req, res) => {
     res.status(500).json({ error: "Failed to update public search" });
   }
 });
+
+// User authentication and verified-account checks are inherited from /api/servers.
+serverRouter.use("/:id/local-computer", localComputerRouter);
+serverRouter.use("/:id/remote-computer", remoteComputerRouter);

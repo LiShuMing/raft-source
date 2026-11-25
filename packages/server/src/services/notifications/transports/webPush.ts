@@ -19,6 +19,7 @@
  * subscription (`deleteWebPushSubscription`). A DNS failure or a timeout is
  * transient.
  */
+import { isStandaloneMode } from "../../../config/deploymentMode";
 import { createHash } from "node:crypto";
 import { lookup as dnsLookup } from "node:dns/promises";
 import { Agent as HttpsAgent } from "node:https";
@@ -81,7 +82,7 @@ export function __resetWebPushRuntimeForTests() {
 }
 
 export function isWebPushEnabled(): boolean {
-  return webPushRuntime.enabled;
+  return !isStandaloneMode() && webPushRuntime.enabled;
 }
 
 export function getVapidPublicKey(): string {

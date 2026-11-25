@@ -32,6 +32,7 @@ import { OwnApiKeyRow, RuntimeGroupLabel, RuntimeRow } from "./ServerSetupRuntim
 import { RuntimesNotReportedHint } from "./RuntimesNotReportedHint";
 import { SetupDesktopDownload } from "./SetupDesktopDownload";
 import { useDesktopFirstOffer } from "./useDesktopFirstOffer";
+import { useAuthProviders } from "../../hooks/useAuthProviders";
 
 export type ServerSetupComputer = {
   id: string;
@@ -217,6 +218,7 @@ export default function ServerSetupComputerRuntimeStep({
 }: ServerSetupComputerRuntimeStepProps) {
   const intl = useIntl();
   const { formatMessage } = intl;
+  const { standalone } = useAuthProviders();
   // Inside an app that is itself the Computer host (Raft Desktop), connecting
   // is one click on this machine: no CLI install, terminal or browser approval.
   const computerHost = useLocalComputerHost();
@@ -298,10 +300,10 @@ export default function ServerSetupComputerRuntimeStep({
   // "the binary is already on the machine — so this replaces the old install+setup surface")
   // and onboarding simply never used the answer. Two screens, one fact, two attitudes: the
   // computer page recognised the user, this one asked who they were.
-  const recovering = !computerOnline && hasConnectedComputer;
+  const recovering = !standalone && !computerOnline && hasConnectedComputer;
   // Snapshotted at mount: a fresh connect keeps the notice once online; a return with a connected computer never shows it.
   const [showAccessNotice] = useState(() => !hasConnectedComputer);
-  const desktopFirst = !computerHost && !recovering && desktopOffer.offered;
+  const desktopFirst = !standalone && !computerHost && !recovering && desktopOffer.offered;
   const recoveringMany = recovering && offlineComputers.length > 1;
   // The computer has actually answered the runtime question (whatever the answer was),
   // as opposed to being online but not having reported yet.
@@ -454,6 +456,7 @@ export default function ServerSetupComputerRuntimeStep({
           {recovering || (useHost && !anotherMachine) || hostPending || desktopFirst ? null : (
             <>
               <ComputerCommandGuide
+                localServerId={standalone ? serverId : undefined}
                 computerCommand={setupCommand}
                 computerInstallCommand={computerInstallCommand}
                 computerInstallAndSetupCommand={computerInstallAndSetupCommand}
@@ -464,7 +467,7 @@ export default function ServerSetupComputerRuntimeStep({
               />
               {/* Instructions are for someone who has not run it yet; once the computer is
                   online they are just history. The log takes over. */}
-              {computerOnline ? null : <ConnectComputerInstructions platform={platform} />}
+              {computerOnline || standalone ? null : <ConnectComputerInstructions platform={platform} />}
             </>
           )}
           {recovering || (useHost && !anotherMachine) || (desktopFirst && !computerOnline) ? null : (

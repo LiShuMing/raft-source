@@ -38,15 +38,22 @@ function rememberProviderCount(providers: AuthProvider[]): void {
   }
 }
 
-let cachedProviders: AuthProvider[] | null = null;
-let providersRequest: Promise<AuthProvider[]> | null = null;
+interface AuthConfiguration {
+  providers: AuthProvider[];
+  standalone: boolean;
+}
+
+const DEFAULT_CONFIGURATION: AuthConfiguration = { providers: DEFAULT_PROVIDERS, standalone: false };
+
+let cachedConfiguration: AuthConfiguration | null = null;
+let providersRequest: Promise<AuthConfiguration> | null = null;
 /** Some Server offers single sign-on (RFC 083): the sign-in page shows "Continue with SSO". */
 let ssoOffered = false;
 /** The source-available deployment is at the Raft License's user limit: the sign-up page says so (signing up still works). */
 let deploymentUserLimitReached = false;
 
 export function __resetAuthProvidersForTest(): void {
-  cachedProviders = null;
+  cachedConfiguration = null;
   providersRequest = null;
   ssoOffered = false;
   deploymentUserLimitReached = false;
@@ -72,8 +79,8 @@ function normalizeProviders(data: unknown): AuthProvider[] {
     }));
 }
 
-async function fetchAuthProviders(): Promise<AuthProvider[]> {
-  if (cachedProviders) return cachedProviders;
+async function fetchAuthProviders(): Promise<AuthConfiguration> {
+  if (cachedConfiguration) return cachedConfiguration;
   if (!providersRequest) {
     providersRequest = api.get("/auth/providers")
       .then(({ data }) => {
@@ -81,21 +88,25 @@ async function fetchAuthProviders(): Promise<AuthProvider[]> {
         deploymentUserLimitReached = (data as { deploymentUserLimitReached?: unknown } | null)?.deploymentUserLimitReached === true;
         const providers = normalizeProviders(data);
         rememberProviderCount(providers);
-        return providers;
+        return {
+          providers,
+          standalone: (data as { deploymentMode?: unknown } | null)?.deploymentMode === "standalone",
+        };
       })
-      .catch(() => DEFAULT_PROVIDERS)
+      .catch(() => DEFAULT_CONFIGURATION)
       .finally(() => {
         providersRequest = null;
       });
   }
 
-  cachedProviders = await providersRequest;
-  return cachedProviders;
+  cachedConfiguration = await providersRequest;
+  return cachedConfiguration;
 }
 
 export function useAuthProviders() {
-  const [providers, setProviders] = useState<AuthProvider[]>(cachedProviders ?? DEFAULT_PROVIDERS);
-  const [loading, setLoading] = useState(!cachedProviders);
+  const [configuration, setConfiguration] = useState<AuthConfiguration>(cachedConfiguration ?? DEFAULT_CONFIGURATION);
+  const { providers, standalone } = configuration;
+  const [loading, setLoading] = useState(!cachedConfiguration);
   const [expectedCount] = useState(rememberedProviderCount);
 
   useEffect(() => {
@@ -105,10 +116,10 @@ export function useAuthProviders() {
       try {
         const data = await fetchAuthProviders();
         if (!cancelled) {
-          setProviders(data);
+          setConfiguration(data);
         }
       } catch {
-        if (!cancelled) setProviders(DEFAULT_PROVIDERS);
+        if (!cancelled) setConfiguration(DEFAULT_CONFIGURATION);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -138,5 +149,6 @@ export function useAuthProviders() {
     expectedCount,
     ssoOffered: !loading && ssoOffered,
     deploymentUserLimitReached: !loading && deploymentUserLimitReached,
+    standalone,
   };
 }

@@ -1,3 +1,5 @@
+import { isStandaloneMode } from "../config/deploymentMode";
+import { resolveEffectiveStandalonePlan } from "../standalone/plan";
 import { markAgentProgress } from "./agentProgressMarks";
 import { readSlackBotMentionAuthority } from "./slackBotMentionAuthority";
 import { acquireFeatureFlagReadLock, evaluateFeatureFlag } from "./featureFlagService";
@@ -542,7 +544,7 @@ async function createChannelWithExecutor(
   // ordinary public/private channel quota; they are invite-mediated shared
   // surfaces, not local channels a workspace can freely create.
   const [serverRow] = await executor.select({ plan: servers.plan }).from(servers).where(eq(servers.id, serverId));
-  const plan = (serverRow?.plan as ServerPlan) || "free";
+  const plan = resolveEffectiveStandalonePlan((serverRow?.plan as ServerPlan) || "free");
   const limits = getEffectiveLimits(plan);
   if (type !== "joint" && limits.maxChannels !== -1) {
     const [countRow] = await executor
@@ -19588,7 +19590,7 @@ function toNullableNumber(value: unknown): number | null {
  */
 export async function selectAgentInboxChainRows(agentId: string): Promise<AgentInboxChainSelection> {
   const pool = getRisingWaveInboxPool();
-  if (!pool) return { source: "unavailable", reason: "rw_unconfigured" };
+  if (!pool && !isStandaloneMode()) return { source: "unavailable", reason: "rw_unconfigured" };
   try {
     return { source: "chain", rows: await readAgentInboxChainRows(pool, agentId) };
   } catch (error) {
@@ -19613,10 +19615,15 @@ export type AgentInboxChainReadOptions = {
 
 /** Read one agent's rows from the agent inbox view. Throws on query failure. */
 export async function readAgentInboxChainRows(
-  pool: NonNullable<ReturnType<typeof getRisingWavePool>>,
+  pool: ReturnType<typeof getRisingWavePool>,
   agentId: string,
   opts: AgentInboxChainReadOptions = {},
 ): Promise<AgentInboxChainRow[]> {
+  if (isStandaloneMode()) {
+    const { readPostgresAgentInboxRows } = await import("./postgresAgentInboxSource");
+    return readPostgresAgentInboxRows(agentId, opts);
+  }
+  if (!pool) throw new AgentInboxUnavailableError("Agent inbox source is not configured");
   const values: unknown[] = [agentId];
   const where = ["agent_id = $1"];
   if (opts.kind !== undefined) {
@@ -19707,9 +19714,14 @@ export type AgentInboxTotals = { conversations: number; dms: number; mentions: n
  * query failure.
  */
 export async function readAgentInboxChainTotals(
-  pool: NonNullable<ReturnType<typeof getRisingWavePool>>,
+  pool: ReturnType<typeof getRisingWavePool>,
   agentId: string,
 ): Promise<AgentInboxTotals & { messages: number }> {
+  if (isStandaloneMode()) {
+    const { readPostgresAgentInboxTotals } = await import("./postgresAgentInboxSource");
+    return readPostgresAgentInboxTotals(agentId);
+  }
+  if (!pool) throw new AgentInboxUnavailableError("Agent inbox source is not configured");
   const read = await queryRisingWaveInbox(pool, `SELECT
       count(*) AS conversations,
       count(*) FILTER (WHERE kind = 'dm') AS dms,
@@ -19752,6 +19764,10 @@ export async function readAgentInboxChainTargetSeqs(
   agentId: string,
   targetIds: readonly string[],
 ): Promise<AgentInboxChainSeqRow[] | null> {
+  if (isStandaloneMode()) {
+    const { readPostgresAgentInboxTargetSeqs } = await import("./postgresAgentInboxSource");
+    return readPostgresAgentInboxTargetSeqs(agentId, targetIds);
+  }
   const pool = getRisingWaveInboxPool();
   if (!pool) return null;
   if (targetIds.length === 0) return [];
@@ -20127,7 +20143,7 @@ export async function listAgentInboxWithShownTargets(
   pageRows: AgentInboxChainRow[];
 }> {
   const pool = getRisingWaveInboxPool();
-  if (!pool) throw new AgentInboxUnavailableError("Agent inbox source is not configured");
+  if (!pool && !isStandaloneMode()) throw new AgentInboxUnavailableError("Agent inbox source is not configured");
   let totals: AgentInboxTotals;
   let dmRows: AgentInboxChainRow[];
   try {
@@ -20290,7 +20306,7 @@ export async function listAgentInboxRowsForTargets(
   otherUnread: { conversations: number; messages: number; mentions: number; dms: number };
 }> {
   const pool = getRisingWaveInboxPool();
-  if (!pool) throw new AgentInboxUnavailableError("Agent inbox source is not configured");
+  if (!pool && !isStandaloneMode()) throw new AgentInboxUnavailableError("Agent inbox source is not configured");
   const newestSeqByTarget = new Map<string, number>();
   for (const target of targets) {
     newestSeqByTarget.set(target.channelId, Math.max(target.newestSeq, newestSeqByTarget.get(target.channelId) ?? 0));
@@ -20352,7 +20368,7 @@ export async function readAgentInboxChainRowsForDismiss(
   opts: { beforeSeq: number; limit: number } | { targetIds: readonly string[] },
 ): Promise<AgentInboxChainRow[]> {
   const pool = getRisingWaveInboxPool();
-  if (!pool) throw new AgentInboxUnavailableError("Agent inbox source is not configured");
+  if (!pool && !isStandaloneMode()) throw new AgentInboxUnavailableError("Agent inbox source is not configured");
   let rows: AgentInboxChainRow[];
   try {
     if ("targetIds" in opts) {

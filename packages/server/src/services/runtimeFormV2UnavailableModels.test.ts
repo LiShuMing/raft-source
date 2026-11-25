@@ -57,10 +57,13 @@ test("a runtime without a bundled catalog still reports the models its listing d
     value: { models: [{ id: "q-1", label: "Q 1" }], unavailable: [{ id: "q-pro", label: "Q Pro", reason: "Needs a paid plan" }] },
   });
   assert.deepEqual(qoder.unavailableOptions, [{ value: "q-pro", label: "Q Pro", reason: "Needs a paid plan" }]);
-  const opencode = await modelSource("opencode", {
-    kind: "live",
-    value: { models: [{ id: "a/one", label: "One" }], unavailable: [{ id: "a/two", label: "Two", reason: "" }] },
-  });
-  assert.deepEqual(optionValues(opencode), ["a/one"]);
-  assert.deepEqual(opencode.unavailableOptions, [{ value: "a/two", label: "Two" }]);
+  // OpenCode uses host defaults directly without a model option source.
+  const opencodeResolution = await runtimeFormV2Entry("opencode")!.resolveOptionSource({
+    sourceId: "model",
+    machineId: "machine-1",
+    machine: {},
+    agentOrchestrator: { detectMachineRuntimeModels: async () => { throw new Error("must not probe"); } },
+    routeToComputer: async () => "confirmed_local",
+  } as unknown as RuntimeFormOptionSourceContext);
+  assert.deepEqual(opencodeResolution, { kind: "source", source: null });
 });

@@ -9,6 +9,8 @@ import CenteredCardFrame from "./CenteredCardFrame";
 import { AuthPageIntro } from "./AuthPageFrame";
 import { getCurrentReturnTo, sanitizeReturnTo } from "../../utils/socialAuth";
 import { continueAfterVerify, verificationTokenFromInput } from "./verificationLanding";
+import { useAuthProviders } from "../../hooks/useAuthProviders";
+import LoginPage from "./LoginPage";
 
 interface EmailVerificationPageProps {
   initialToken?: string | null;
@@ -18,7 +20,19 @@ interface EmailVerificationPageProps {
   onVerified?: (landing: string) => void;
 }
 
-export default function EmailVerificationPage({ initialToken, initialReturnTo, onVerified }: EmailVerificationPageProps) {
+export default function EmailVerificationPage(props: EmailVerificationPageProps) {
+  const { standalone, loading } = useAuthProviders();
+  const { formatMessage } = useIntl();
+  // Wait for server capabilities before consuming a one-time email token. Old
+  // standalone accounts recover through password sign-in instead of email.
+  if (loading) {
+    return <CenteredCardFrame><p role="status">{formatMessage({ id: "auth.local.loading" })}</p></CenteredCardFrame>;
+  }
+  if (standalone) return <LoginPage />;
+  return <EmailVerificationForm {...props} />;
+}
+
+function EmailVerificationForm({ initialToken, initialReturnTo, onVerified }: EmailVerificationPageProps) {
   const { formatMessage } = useIntl();
   const verifyEmail = useAuthStore((s) => s.verifyEmail);
   const resendVerification = useAuthStore((s) => s.resendVerification);

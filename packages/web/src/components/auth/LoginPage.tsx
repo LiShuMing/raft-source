@@ -41,7 +41,7 @@ export interface AccountLinkSignIn {
 export interface LoginPageProps {
   accountLink?: AccountLinkSignIn;
   onSwitchToRegister?: () => void;
-  onForgotPassword: () => void;
+  onForgotPassword?: () => void;
   /**
    * Why sign-in is asked for here, a line under the title above the form: an external app's link, or "Sign in to
    * open this Artifact" on a canonical Artifact link (back after #proj-workspace:#250: it tells people what's
@@ -70,8 +70,9 @@ function LoginPageForm({ onSwitchToRegister, onForgotPassword, accountLink, purp
   const { formatMessage } = useIntl();
   const login = useAuthStore((s) => s.login);
   const loading = useAuthStore((s) => s.loading);
-  const { enabledProviders, loading: providersLoading, expectedCount: expectedProviderCount, ssoOffered } = useAuthProviders();
-  const [email, setEmail] = useState(accountLink?.email ?? "");
+  const { enabledProviders, loading: providersLoading, expectedCount: expectedProviderCount, ssoOffered, standalone } = useAuthProviders();
+  const currentUser = useAuthStore((s) => s.user);
+  const [email, setEmail] = useState(accountLink?.email ?? currentUser?.email ?? "");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [errorTraceId, setErrorTraceId] = useState<string | null>(null);
@@ -142,6 +143,11 @@ function LoginPageForm({ onSwitchToRegister, onForgotPassword, accountLink, purp
     try {
       if (accountLink) await accountLink.signIn(email, password);
       else await login(email, password);
+      if (standalone) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("verify");
+        window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+      }
     } catch (err: any) {
       const failed = formatMessage({ id: "pages.login.failed" });
       const message = authServerErrorMessage(err, failed, formatMessage);
@@ -164,8 +170,8 @@ function LoginPageForm({ onSwitchToRegister, onForgotPassword, accountLink, purp
     <AuthPageFrame topStrip={accountLink ? undefined : topStrip} bottomStrip={accountLink ? undefined : bottomStrip}>
       <div className="w-full">
         <AuthPageIntro
-          title={formatMessage({ id: accountLink ? "auth.accountLink.title" : "pages.login.title" })}
-          description={!accountLink && purpose ? <span data-testid="login-purpose">{purpose}</span> : undefined}
+          title={formatMessage({ id: standalone ? "auth.local.signInTitle" : accountLink ? "auth.accountLink.title" : "pages.login.title" })}
+          description={standalone ? formatMessage({ id: "auth.local.signInDescription" }) : !accountLink && purpose ? <span data-testid="login-purpose">{purpose}</span> : undefined}
         />
 
         {accountLink && !accountLink.terminal && (
@@ -200,11 +206,11 @@ function LoginPageForm({ onSwitchToRegister, onForgotPassword, accountLink, purp
           </FormField>
           <FormField
             label={formatMessage({ id: "pages.login.passwordLabel" })}
-            labelAction={(
+            labelAction={!standalone && onForgotPassword ? (
               <TextLink className="text-footnote" onClick={onForgotPassword}>
                 {formatMessage({ id: "pages.login.forgotPassword" })}
               </TextLink>
-            )}
+            ) : undefined}
             error={fieldErrors.password}
             htmlFor="login-password"
           >
@@ -235,7 +241,7 @@ function LoginPageForm({ onSwitchToRegister, onForgotPassword, accountLink, purp
           </Button>
         </form>}
 
-        {accountLink && !accountLink.terminal && !accountLink.signInMethods.password && (
+        {accountLink && !accountLink.terminal && !accountLink.signInMethods.password && !standalone && onForgotPassword && (
           <TextLink className="mb-4 text-footnote" onClick={onForgotPassword}>
             {formatMessage({ id: "pages.login.forgotPassword" })}
           </TextLink>

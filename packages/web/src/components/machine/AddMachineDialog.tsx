@@ -22,6 +22,8 @@ import FormField from "../ui/FormField";
 import Banner from "../ui/Banner";
 import KeyValueRow from "../ui/KeyValueRow";
 import ComputerCommandGuide from "./ComputerCommandGuide";
+import StandaloneComputerConnect from "./StandaloneComputerConnect";
+import { useAuthProviders } from "../../hooks/useAuthProviders";
 import { ComputerAccessNotice } from "./ComputerAccessNotice";
 import MachineRuntimeChips from "./MachineRuntimeChips";
 import { useAuthStore } from "../../store/authStore";
@@ -62,7 +64,22 @@ type MachineType = "this" | "own";
  * The `another-computer` intent (This device's "Install on another computer"
  * when this computer can't run Raft Computer) opens straight on the command.
  */
-export default function AddMachineDialog({ onClose, intent: intentProp }: { onClose: () => void; intent?: AddMachineIntent }) {
+export default function AddMachineDialog(props: { onClose: () => void; intent?: AddMachineIntent }) {
+  const { standalone } = useAuthProviders();
+  const serverId = useServerStore((state) => state.current?.id);
+  if (standalone && serverId) {
+    return (
+      <DialogCard title="Connect a Computer" onClose={props.onClose} maxWidthClass="max-w-2xl">
+        <div className="max-h-[75dvh] overflow-y-auto overscroll-contain pr-1">
+          <StandaloneComputerConnect key={serverId} serverId={serverId} />
+        </div>
+      </DialogCard>
+    );
+  }
+  return <RemoteAddMachineDialog {...props} />;
+}
+
+function RemoteAddMachineDialog({ onClose, intent: intentProp }: { onClose: () => void; intent?: AddMachineIntent }) {
   const host = useLocalComputerHost();
   // How it was opened (setShowAddMachine's intent), unless the caller says.
   const storedIntent = useMachineStore((s) => s.addMachineIntent);

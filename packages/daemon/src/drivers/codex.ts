@@ -910,8 +910,17 @@ export function codexManagedMcpConfigArgs(managedMcp?: { name: string; endpointU
   ];
 }
 
-export function buildCodexAppServerArgs(managedMcp?: { name: string; endpointUrl: string } | null): string[] {
-  return ["app-server", ...codexManagedMcpConfigArgs(managedMcp), "--listen", "stdio://"];
+export function buildCodexAppServerArgs(
+  managedMcp?: { name: string; endpointUrl: string } | null,
+  disableTelemetry = false,
+): string[] {
+  return [
+    "app-server",
+    ...(disableTelemetry ? ["-c", "analytics.enabled=false", "-c", "feedback.enabled=false", "-c", 'otel.exporter="none"'] : []),
+    ...codexManagedMcpConfigArgs(managedMcp),
+    "--listen",
+    "stdio://",
+  ];
 }
 
 
@@ -988,7 +997,7 @@ export async function prepareCodexLaunch(ctx: SpawnContext): Promise<CodexLaunch
     defaultHomeDir: os.homedir(),
     cwd: ctx.workingDirectory,
   });
-  const appServerArgs = buildCodexAppServerArgs(managedMcp);
+  const appServerArgs = buildCodexAppServerArgs(managedMcp, spawnEnv.RAFT_DEPLOYMENT_MODE === "standalone");
   // task #1277: candidate discovery and the app-server probes run as bounded
   // probe children under this start attempt's signal; a cancelled lookup is
   // rethrown, never a verdict, and nothing is written to the probe cache.

@@ -1,3 +1,5 @@
+import { isStandaloneMode } from "../config/deploymentMode";
+import { offlineHtmlPreviewCsp, readOfflineHtmlPreview } from "../standalone/htmlPreview";
 import { DmPeerNotMemberError } from "../services/dmSendPolicy";
 import { Router, type NextFunction, type Request, type Response, type Router as RouterType } from "express";
 import { UUID_RE } from "../lib/messageId";
@@ -712,6 +714,7 @@ export function buildAttachmentInlinePreviewContentSecurityPolicy(frameAncestorO
 }
 
 export function buildHtmlPreviewContentSecurityPolicy(frameAncestorOrigins = getPreviewFrameAncestorOrigins()): string {
+  if (isStandaloneMode()) return offlineHtmlPreviewCsp(frameAncestorOrigins);
   const frameAncestors = ["'self'", ...frameAncestorOrigins].join(" ");
   return [
     "default-src 'none'",
@@ -1485,6 +1488,11 @@ attachmentPublicRouter.get("/:id/html-preview", async (req, res) => {
     }
 
     const stream = await storage.get(attachment.storageKey);
+    const offlineHtml = isStandaloneMode() ? await readOfflineHtmlPreview(stream) : undefined;
+    if (offlineHtml === null) {
+      res.status(413).json({ error: "Offline HTML previews are limited to 2 MiB. Download the original file instead." });
+      return;
+    }
     res.setHeader("Cache-Control", "private, no-store");
     res.setHeader("Content-Type", buildAttachmentResponseContentType(resolvedMimeType));
     res.setHeader("Content-Security-Policy", buildHtmlPreviewContentSecurityPolicy());
@@ -1495,6 +1503,10 @@ attachmentPublicRouter.get("/:id/html-preview", async (req, res) => {
     res.removeHeader("X-Frame-Options");
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Content-Disposition", buildContentDisposition("inline", attachment.filename));
+    if (offlineHtml !== undefined) {
+      res.send(offlineHtml);
+      return;
+    }
     // Measurement bridge (task #16): normally appended, but inserted before
     // an attachment-owned CSP meta tag so a strict report can still announce
     // bridge readiness. The attachment CSP remains in place for every later

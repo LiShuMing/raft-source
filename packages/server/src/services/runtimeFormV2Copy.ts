@@ -45,6 +45,7 @@ const ZH_CN: Readonly<Record<string, string>> = Object.freeze({
   "Model": "模型",
   "Model ID": "模型 ID",
   "Provider": "提供方",
+  "Configuration": "配置方式",
   "Reasoning": "推理强度",
   "Supports image input": "支持图片输入",
   "Thinking effort": "思考强度",
@@ -54,6 +55,8 @@ const ZH_CN: Readonly<Record<string, string>> = Object.freeze({
   "Available values depend on the selected model.": "可选值取决于所选模型。",
   "Built-in Pi is ready to use without local runtime setup. It uses the provider key entered here.":
     "内置 Pi 无需本地运行时设置即可使用。它会使用这里填写的提供方密钥。",
+  "Configured automatically uses this computer's Pi default model and credentials. Other providers require their own API key.":
+    "已配置会自动使用这台计算机的 Pi 默认模型和凭证，无需选择模型。其他提供商需要单独填写 API Key。",
   "Configured uses your machine's Pi auth.json. Other options inject the matching API key as an env var so the Pi SDK picks it up — no auth.json edit on your machine.":
     "已配置模式会使用你机器上的 Pi auth.json。其他选项会把对应 API 密钥注入为环境变量，让 Pi SDK 自动读取——无需修改机器上的 auth.json。",
   "Default leaves Claude Code provider settings untouched. Custom sets ANTHROPIC_BASE_URL and, from the key, ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN for this agent.":
@@ -99,6 +102,11 @@ const ZH_CN: Readonly<Record<string, string>> = Object.freeze({
   "Maximum reasoning with automatic task delegation": "最大推理，并自动进行任务委派",
   "Lower latency": "更低延迟",
   // Generic option labels (model and provider names are never translated)
+  "Machine settings": "沿用机器配置",
+  "Override model": "仅覆盖模型",
+  "Custom connection": "自定义连接",
+  "Machine settings is recommended: Claude resolves its own model without --model. Advanced environment variables can override native settings.":
+    "推荐沿用机器配置，由 Claude 自行决定模型，不传入 --model。高级环境变量可覆盖机器配置。",
   "Auto": "自动",
   "Configured": "已配置",
   "Configured Default": "已配置的默认值",
@@ -189,6 +197,14 @@ const JA: Readonly<Record<string, string>> = Object.freeze({
   "Maximum reasoning with automatic task delegation": "最大限の推論とタスクの自動委任",
   "Lower latency": "低レイテンシー",
   // Generic option labels (model and provider names are never translated)
+  "Configuration": "構成",
+  "Configured automatically uses this computer's Pi default model and credentials. Other providers require their own API key.":
+    "「設定済み」はこのコンピューターの Pi のデフォルトモデルと認証情報を自動的に使用します。他のプロバイダーにはそれぞれの API キーが必要です。",
+  "Machine settings": "マシン設定を使用",
+  "Override model": "モデルのみ上書き",
+  "Custom connection": "カスタム接続",
+  "Machine settings is recommended: Claude resolves its own model without --model. Advanced environment variables can override native settings.":
+    "マシン設定の使用を推奨します。Claude は --model を指定せず自動でモデルを決定します。高度な環境変数でネイティブ設定を上書きできます。",
   "Auto": "自動",
   "Configured": "設定済み",
   "Configured Default": "設定済みのデフォルト",
@@ -289,6 +305,14 @@ const ES: Readonly<Record<string, string>> = Object.freeze({
   "Maximum reasoning with automatic task delegation": "Razonamiento máximo con delegación automática de tareas",
   "Lower latency": "Menor latencia",
   // Generic option labels (model and provider names are never translated)
+  "Configuration": "Configuración",
+  "Configured automatically uses this computer's Pi default model and credentials. Other providers require their own API key.":
+    "“Configurado” usa automáticamente el modelo y las credenciales predeterminados de Pi en esta computadora. Otros proveedores requieren su propia clave de API.",
+  "Machine settings": "Configuración del equipo",
+  "Override model": "Anular modelo",
+  "Custom connection": "Conexión personalizada",
+  "Machine settings is recommended: Claude resolves its own model without --model. Advanced environment variables can override native settings.":
+    "Se recomienda la configuración del equipo: Claude resuelve su propio modelo sin --model. Las variables de entorno avanzadas pueden anular la configuración nativa.",
   "Auto": "Automático",
   "Configured": "Configurado",
   "Configured Default": "Predeterminado configurado",
@@ -390,6 +414,14 @@ const PT_BR: Readonly<Record<string, string>> = Object.freeze({
   "Maximum reasoning with automatic task delegation": "Raciocínio máximo com delegação automática de tarefas",
   "Lower latency": "Menor latência",
   // Generic option labels (model and provider names are never translated)
+  "Configuration": "Configuração",
+  "Configured automatically uses this computer's Pi default model and credentials. Other providers require their own API key.":
+    "“Configurado” usa automaticamente o modelo e as credenciais padrão do Pi neste computador. Outros provedores exigem sua própria chave de API.",
+  "Machine settings": "Configurações da máquina",
+  "Override model": "Substituir modelo",
+  "Custom connection": "Conexão personalizada",
+  "Machine settings is recommended: Claude resolves its own model without --model. Advanced environment variables can override native settings.":
+    "Recomenda-se usar as configurações da máquina: o Claude resolve o próprio modelo sem --model. Variáveis de ambiente avançadas podem substituir as configurações nativas.",
   "Auto": "Automático",
   "Configured": "Configurado",
   "Configured Default": "Padrão configurado",
@@ -490,6 +522,14 @@ const RU: Readonly<Record<string, string>> = Object.freeze({
   "Maximum reasoning with automatic task delegation": "Максимальная глубина рассуждений и автоматическое делегирование задач",
   "Lower latency": "Меньшая задержка",
   // Generic option labels (model and provider names are never translated)
+  "Configuration": "Конфигурация",
+  "Configured automatically uses this computer's Pi default model and credentials. Other providers require their own API key.":
+    "Вариант «Настроенный» автоматически использует модель и учётные данные Pi по умолчанию на этом компьютере. Для других провайдеров требуется собственный ключ API.",
+  "Machine settings": "Настройки машины",
+  "Override model": "Переопределить модель",
+  "Custom connection": "Пользовательское подключение",
+  "Machine settings is recommended: Claude resolves its own model without --model. Advanced environment variables can override native settings.":
+    "Рекомендуется использовать настройки машины: Claude сам выбирает модель без --model. Переменные окружения в расширенных настройках могут переопределять локальную конфигурацию.",
   "Auto": "Авто",
   "Configured": "Настроенный",
   "Configured Default": "По умолчанию из настроек",
@@ -580,6 +620,14 @@ const KO: Readonly<Record<string, string>> = Object.freeze({
   "Maximum reasoning with automatic task delegation": "최대 수준으로 추론하고 작업을 자동으로 위임해요",
   "Lower latency": "더 낮은 지연 시간",
   // Generic option labels (model and provider names are never translated)
+  "Configuration": "구성",
+  "Configured automatically uses this computer's Pi default model and credentials. Other providers require their own API key.":
+    "‘설정됨’은 이 컴퓨터의 Pi 기본 모델과 자격 증명을 자동으로 사용해요. 다른 제공업체는 별도의 API 키가 필요해요.",
+  "Machine settings": "머신 설정",
+  "Override model": "모델 재정의",
+  "Custom connection": "사용자 지정 연결",
+  "Machine settings is recommended: Claude resolves its own model without --model. Advanced environment variables can override native settings.":
+    "머신 설정을 권장해요. Claude는 --model 없이 자체적으로 모델을 결정하며, 고급 환경 변수로 기본 설정을 재정의할 수 있어요.",
   "Auto": "자동",
   "Configured": "설정됨",
   "Configured Default": "설정된 기본값",
@@ -670,6 +718,14 @@ const ZH_TW: Readonly<Record<string, string>> = Object.freeze({
   "Maximum reasoning with automatic task delegation": "最高推理深度，並自動委派任務",
   "Lower latency": "延遲更低",
   // Generic option labels (model and provider names are never translated)
+  "Configuration": "設定方式",
+  "Configured automatically uses this computer's Pi default model and credentials. Other providers require their own API key.":
+    "「已設定」會自動使用這台電腦的 Pi 預設模型與憑證。其他供應商需要各自的 API 金鑰。",
+  "Machine settings": "沿用機器設定",
+  "Override model": "僅覆寫模型",
+  "Custom connection": "自訂連線",
+  "Machine settings is recommended: Claude resolves its own model without --model. Advanced environment variables can override native settings.":
+    "建議沿用機器設定，由 Claude 自行決定模型，不傳入 --model。進階環境變數可覆寫機器設定。",
   "Auto": "自動",
   "Configured": "已設定",
   "Configured Default": "已設定的預設值",

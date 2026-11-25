@@ -5,16 +5,8 @@
   "dataSchema": {
     "type": "object",
     "additionalProperties": false,
-    "required": [
-      "model"
-    ],
+    "required": [],
     "properties": {
-      "model": {
-        "type": "string",
-        "title": "Model",
-        "minLength": 1,
-        "x-optionSource": "model"
-      },
       "envVars": {
         "type": "object",
         "title": "Environment Variables",
@@ -26,7 +18,6 @@
   },
   "uiSchema": {
     "order": [
-      "model",
       "envVars"
     ],
     "layout": {
@@ -36,10 +27,6 @@
     },
     "visibility": [],
     "localization": {
-      "model": {
-        "label": "Model",
-        "hint": "Models available from this computer's OpenCode configuration."
-      },
       "envVars": {
         "label": "Environment Variables",
         "hint": "These will be injected into the runtime command environment."
@@ -53,14 +40,5 @@
       "/hostUserState"
     ]
   },
-  "optionSources": {
-    "model": {
-      "protocolVersion": 1,
-      "runtimeId": "opencode",
-      "schemaVersion": "opencode.create.v1",
-      "sourceId": "model",
-      "kind": "select",
-      "pointer": "/model"
-    }
-  }
+  "optionSources": {}
 }

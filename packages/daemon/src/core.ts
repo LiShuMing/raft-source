@@ -61,6 +61,7 @@ import {
   type TraceStatus,
   type Tracer,
   DAEMON_CAPABILITY_SEQUENCED_STATUS,
+  DAEMON_CAPABILITY_CLAUDE_MACHINE_SETTINGS,
   DAEMON_CAPABILITY_INTERRUPT_SUBAGENT,
   DAEMON_CAPABILITY_INTERRUPT_TURN,
   DAEMON_CAPABILITY_AGENT_SIDE_ASK,
@@ -8010,6 +8011,7 @@ export class DaemonCore {
         "agent:deliver",
         "workspace:files",
         DAEMON_CAPABILITY_SEQUENCED_STATUS,
+        DAEMON_CAPABILITY_CLAUDE_MACHINE_SETTINGS,
         DAEMON_CAPABILITY_INTERRUPT_TURN,
         DAEMON_CAPABILITY_INTERRUPT_SUBAGENT,
         // #wg-runtime-form:#22: status now and side questions (agentSideAsk.ts).

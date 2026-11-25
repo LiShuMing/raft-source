@@ -8,21 +8,9 @@
   "options": [
     {
       "value": "default",
-      "label": "Configured Default / Auto",
-      "supportedReasoningEfforts": [
-        "off",
-        "minimal",
-        "low",
-        "medium",
-        "high",
-        "xhigh",
-        "max"
-      ]
+      "label": "Configured Default / Auto"
     }
   ],
   "defaultValue": "default",
-  "customValueAllowed": true,
-  "status": "fallback",
-  "reason": "missing_config",
-  "retryable": false
+  "customValueAllowed": false
 }

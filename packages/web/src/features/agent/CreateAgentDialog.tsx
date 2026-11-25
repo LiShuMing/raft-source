@@ -1098,6 +1098,7 @@ export function CreateAgentDialog({
                   // The same v2 form as a normal create: its technical fields sit
                   // in the collapsed Advanced section (task #8).
                   runtimeFormV2={runtimeFormV2Prop}
+                  executionComputer={selectedMachine}
                   runtime={runtime}
                   onRuntimeChange={chooseOnboardingRuntime}
                   runtimeBelowDescription={onboardingRuntimeNotice}
@@ -1450,6 +1451,7 @@ export function CreateAgentDialog({
             <RuntimeConfigFields
               showValidationErrors={validationAttempted}
               runtimeFormV2={runtimeFormV2Prop}
+              executionComputer={selectedMachine}
               runtime={runtime}
               onRuntimeChange={setRuntime}
               runtimeOptions={runtimeOptions}

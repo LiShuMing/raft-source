@@ -13,6 +13,7 @@
  * (type-only imports) so the test setup can install the reference without
  * loading channelService. Production never sets the override.
  */
+import { isStandaloneMode } from "../config/deploymentMode";
 import type { DbQueryTracer } from "../tracing/dbQueryTrace";
 import type {
   ActivityUnreadTotals,
@@ -55,6 +56,25 @@ export type ActivityReadSource = {
   followedThreadRows(query: FollowedThreadRowsQuery): Promise<FollowedThreadRwRow[]>;
 };
 
+const standaloneSource: ActivityReadSource = {
+  async inboxItems(...args) {
+    const { postgresActivityReadSource } = await import("./postgresActivityReadSource");
+    return postgresActivityReadSource.inboxItems(...args);
+  },
+  async activityUnreadTotals(...args) {
+    const { postgresActivityReadSource } = await import("./postgresActivityReadSource");
+    return postgresActivityReadSource.activityUnreadTotals(...args);
+  },
+  async followedThreadStats(query) {
+    const { postgresActivityReadSource } = await import("./postgresActivityReadSource");
+    return postgresActivityReadSource.followedThreadStats(query);
+  },
+  async followedThreadRows(query) {
+    const { postgresActivityReadSource } = await import("./postgresActivityReadSource");
+    return postgresActivityReadSource.followedThreadRows(query);
+  },
+};
+
 let testSource: ActivityReadSource | null = null;
 
 /** TEST-ONLY: replace the RisingWave Activity reads with another source (null restores RisingWave). */
@@ -62,6 +82,9 @@ export function __setActivityReadSourceForTests(source: ActivityReadSource | nul
   testSource = source;
 }
 
-export function getActivityReadSourceOverride(): ActivityReadSource | null {
-  return testSource;
+export function getActivityReadSource(): ActivityReadSource | null {
+  return testSource ?? (isStandaloneMode() ? standaloneSource : null);
 }
+
+/** Compatibility name for tests that snapshot the installed source. */
+export const getActivityReadSourceOverride = getActivityReadSource;

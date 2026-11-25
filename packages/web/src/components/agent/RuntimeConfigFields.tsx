@@ -23,6 +23,7 @@ import { KeyValueAddButton } from "../ui/KeyValueInput";
 import Tooltip from "../ui/Tooltip";
 import { RuntimeEnvVarRow } from "./RuntimeEnvVarRow";
 import { RuntimeFormV2FieldControl } from "./RuntimeFormV2FieldControl";
+import { ClaudeConfigurationSummary, type ExecutionComputer } from "./ClaudeConfigurationSummary";
 import { RuntimeUpgradeTargetContext } from "../../features/computer/runtimeUpgradeTarget";
 import type { RuntimeUpgradeTarget } from "../../features/computer/runtimeUpgradeTarget";
 
@@ -400,6 +401,7 @@ interface RuntimeConfigFieldsProps {
   onRuntimeChange: (runtime: string) => void;
   runtimeOptions: RuntimeOption[];
   runtimeLabel?: string;
+  executionComputer?: ExecutionComputer | null;
   /** The runtime field has no error or hint of its own, so its message row is
    *  only reserved space. Pass `false` where no neighbouring field's height has to
    *  match (Cindy's setup screen, where it read as a missing line). */
@@ -455,6 +457,7 @@ export default function RuntimeConfigFields({
   onRuntimeChange,
   runtimeOptions,
   runtimeLabel,
+  executionComputer,
   reserveRuntimeMessage = true,
   runtimeBelowDescription,
   runtimeListAction,
@@ -505,6 +508,12 @@ export default function RuntimeConfigFields({
         />
       </Field>
 
+      {runtime === "claude" && executionComputer && (!runtimeFormV2 || (runtimeFormV2.state.status === "ready" && runtimeFormV2.values)) && (
+        <ClaudeConfigurationSummary
+          computer={executionComputer}
+          mode={runtimeFormV2?.values && typeof runtimeFormV2.values.provider === "string" ? runtimeFormV2.values.provider : "machine"}
+        />
+      )}
       {runtimeFormV2 && (
         runtimeFormV2.state.status === "ready" && runtimeFormV2.values ? (
           <RuntimeUpgradeTargetContext.Provider value={upgradeContext}>

@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { isStandaloneMode } from "../config/deploymentMode";
 import { isPrivacyModeOn } from "../config/privacyMode";
 import { refuse } from "../lib/refusal";
 
@@ -15,6 +16,10 @@ export interface OtlpRelayConfig {
 }
 
 export async function otlpRelayHandler(req: Request, res: Response, config: OtlpRelayConfig = {}): Promise<void> {
+  if (isStandaloneMode()) {
+    res.status(503).json({ error: "Trace forwarding is disabled by the standalone privacy policy" });
+    return;
+  }
   if (config.privacyMode ?? isPrivacyModeOn()) {
     refuse(res, 404, { code: "otlp_relay_disabled", error: "This server runs in privacy mode (RAFT_PRIVACY_MODE), so it relays no traces; unset it to relay." });
     return;

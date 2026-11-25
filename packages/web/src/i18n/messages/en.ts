@@ -15,6 +15,16 @@
 // from the foundation, before any real plural/currency copy is migrated.
 
 export const en = {
+  "agent.claudeSettings.target": "Runs on {name}",
+  "agent.claudeSettings.online": "Online",
+  "agent.claudeSettings.offline": "Offline — settings are unavailable",
+  "agent.claudeSettings.machineHint": "Uses this Computer's Claude settings (including ~/.claude/settings.json) and credentials. The model is resolved at launch and has not been verified here. Claude decides precedence when settings conflict.",
+  "agent.claudeSettings.overrideHint": "Uses this Computer's Claude connection and credentials with your selected model.",
+  "agent.claudeSettings.customHint": "Uses the URL, key and model you enter. These credentials are stored by this platform.",
+  "agent.claudeSettings.machine": "Machine settings",
+  "agent.claudeSettings.override": "Override model",
+  "agent.claudeSettings.custom": "Custom connection",
+  "agent.claudeSettings.configuration": "Configuration",
 
   "auth.accountLink.mismatch": "You signed in to a different account than {email}, so {provider} wasn't connected. Please sign in with {email}.",
   "auth.accountLink.providerConflict": "This {provider} account is already connected to another Raft account, so it couldn't be connected here.",
@@ -1168,6 +1178,11 @@ export const en = {
   "pages.serverSelector.logOut": "Sign out",
   "pages.serverSelector.switchFailed": "Could not switch servers. Please try again.",
   "pages.login.or": "or",
+  "auth.local.signInTitle": "Sign in to your local workspace",
+  "auth.local.signInDescription": "Use your email and password. No verification code needed.",
+  "auth.local.registerTitle": "Create your local account",
+  "auth.local.registerDescription": "Your account stays on this server. No email verification needed.",
+  "auth.local.loading": "Loading sign-in options…",
   "pages.login.title": "Sign in",
   "pages.login.emailLabel": "Email",
   "pages.login.passwordLabel": "Password",
@@ -2593,7 +2608,7 @@ export const en = {
   "agent.runtimeConfig.configured": "Configured",
   "agent.runtimeConfig.claudeCommand": "Claude command",
   "agent.runtimeConfig.providerHint":
-    "Default leaves Claude Code provider settings untouched. Custom sets ANTHROPIC_BASE_URL and ANTHROPIC_API_KEY for this agent.",
+    "Machine settings uses Claude configuration on the selected Computer without passing --model. Override model keeps its connection. Custom connection stores explicit credentials in this platform. Advanced environment variables may override native settings.",
   "agent.runtimeConfig.apiUrl": "API URL",
   "agent.runtimeConfig.apiUrlInvalid": "API URL must start with http:// or https://.",
   "agent.runtimeConfig.apiKey": "API key",
@@ -2681,8 +2696,7 @@ export const en = {
   "agent.runtimeConfig.builtInRequiredHint": "Required — {runtimeName} needs a provider and API key to run.",
   "agent.runtimeConfig.apiKeyRequiredForProvider": "API Key is required for {provider}.",
   "agent.runtimeConfig.imageInputHint": "Enable only when this gateway endpoint and model accept images.",
-  "agent.runtimeConfig.piProviderHint":
-    "Configured uses your machine's Pi auth.json. Other options inject the matching API key as an env var so the Pi SDK picks it up — no auth.json edit on your machine.",
+  "agent.runtimeConfig.piProviderHint": "Configured automatically uses this computer's Pi default model and credentials. Other providers require their own API key.",
   "agent.runtimeConfig.apiKeyRequiredForBuiltInProvider": "API Key is required when a built-in provider is selected.",
   "agent.runtimeConfig.customModelName": "Custom model name",
   "agent.runtimeConfig.customModelId": "Custom model ID",
@@ -2983,6 +2997,12 @@ export const en = {
   "machine.commandGuide.windows": "Windows",
   "machine.commandGuide.windowsComputerDescription":
     "Install Raft Computer from PowerShell, then connect this Windows x64 machine to the server.",
+  "machine.local.description": "Use the machine running this server. It reuses the installed Claude Code, Codex and their local configuration. No separate Computer CLI installation is needed.",
+  "machine.local.connect": "Use server host",
+  "machine.local.connecting": "Connecting server host…",
+  "machine.local.connected": "Server host connected",
+  "machine.local.statusFailed": "Cannot read the server host status.",
+  "machine.local.connectFailed": "Cannot connect the server host.",
   "machine.commandGuide.macLinuxComputerDescription":
     "Install the Raft Computer CLI on this macOS or Linux machine, then connect it to this server.",
   "machine.commandGuide.generateFreshConnect": "Generate a fresh connect command to continue.",

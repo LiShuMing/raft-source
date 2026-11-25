@@ -309,7 +309,7 @@ test("the request model id is the same OpenRouter API id with and without limits
       const config = parse({ kind: "custom", name, ...limits });
       const registry = await freshRegistry();
       configureBuiltInPresetCustomModel(registry, config);
-      const modelId = config.model.kind === "custom" ? config.model.name : config.model.id;
+      const modelId = config.model.kind === "custom" ? config.model.name : config.model.kind === "preset" ? config.model.id : "";
       const model = resolvePiModelFromRegistry(modelId, registry, config);
       assert.ok(model, `${name} ${JSON.stringify(limits)}`);
       assert.equal(model.provider, "openrouter");

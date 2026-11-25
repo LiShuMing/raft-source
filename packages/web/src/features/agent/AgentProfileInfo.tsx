@@ -140,7 +140,9 @@ export function AgentProfileInfo({ agent, canManageAgent, canChangeAgentRole, on
   // so a catalog reload (after a live detect) re-renders it (#triage:#548).
   useModelLabelCatalog();
   const currentRuntimeModelPresentation = projectRuntimeModelLabelPresentation(currentRuntimeConfig.runtime, currentRuntimeModel, runtimeModels, agent.machineId);
-  const currentRuntimeModelLabel = currentRuntimeModelPresentation.kind === "pending"
+  const currentRuntimeModelLabel = currentRuntimeConfig.model.kind === "machine"
+    ? formatMessage({ id: "agent.claudeSettings.machine" })
+    : currentRuntimeModelPresentation.kind === "pending"
     ? formatMessage({ id: "common.loading" })
     : currentRuntimeModelPresentation.label;
   // The Reasoning row's value, as the Members list and hover card write it; null where the runtime takes no effort.
@@ -499,6 +501,12 @@ export function AgentProfileInfo({ agent, canManageAgent, canChangeAgentRole, on
               </InfoRow>
               {!isExternalAgent && agentMachine && (
                 <>
+                  <InfoRow label="Execution host" testId="agent-execution-host">
+                    <span className="font-mono">{agentMachine.hostname || "Host identity pending"} · {agentMachine.os || "OS pending"}</span>
+                  </InfoRow>
+                  <InfoRow label="Machine ID" testId="agent-execution-machine-id">
+                    <span className="break-all font-mono">{agentMachine.id}</span>
+                  </InfoRow>
                   {/* "Computer status", not "Status": the header already shows the agent's own
                       activity, and these are two different things. */}
                   <InfoRow label={formatMessage({ id: "agent.detail.computerStatus" })} testId="agent-computer-connection">

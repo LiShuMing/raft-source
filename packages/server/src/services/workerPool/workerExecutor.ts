@@ -55,8 +55,12 @@ function withoutHeapSizeFlags(argv: readonly string[]): string[] {
  * same @oxc-node/core register so integration-test workers resolve modules
  * exactly like prod instead of falling back to plain-node type stripping.
  */
-function workerExecArgv(): string[] {
+function workerExecArgv(entry: string | URL): string[] {
   const argv = withoutHeapSizeFlags(process.execArgv);
+  // Compiled workers already have native Node module resolution. Do not
+  // introduce a source loader (or a dependency on its installation) here.
+  const entryPath = entry instanceof URL ? entry.pathname : entry;
+  if (/\.[cm]?js(?:[?#].*)?$/.test(entryPath)) return argv;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--import" && TYPESCRIPT_LOADER_PATTERN.test(argv[i + 1] ?? "")) return argv;
     if (argv[i].startsWith("--import=") && TYPESCRIPT_LOADER_PATTERN.test(argv[i])) return argv;
@@ -96,7 +100,7 @@ export function createWorkerThreadExecutor(deps: WorkerThreadExecutorDeps): Work
     settle: null,
     expectedExit: false,
   }));
-  const execArgv = workerExecArgv();
+  const execArgv = workerExecArgv(workerEntryUrl);
   let closing = false;
 
   function failInFlight(slot: Slot, error: unknown): void {

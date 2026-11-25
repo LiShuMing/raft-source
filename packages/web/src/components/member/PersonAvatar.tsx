@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { User } from "lucide-react";
 import { isHumanPixelAvatarUrl, isRaftUploadedHumanAvatarUrl } from "../../utils/humanAvatar";
+import { isStandaloneDeployment } from "../../utils/deploymentMode";
 import { HumanPixelAvatar } from "./HumanPixelAvatar";
 
 interface PersonAvatarProps {
@@ -18,7 +19,9 @@ interface PersonAvatarProps {
  * service is asked. No avatar at all stays the placeholder: nothing is made up.
  */
 export function PersonAvatar({ avatarUrl, iconSize = 16 }: PersonAvatarProps) {
-  const storedAvatarUrl = isRaftUploadedHumanAvatarUrl(avatarUrl) ? avatarUrl : null;
+  const storedAvatarUrl = isRaftUploadedHumanAvatarUrl(avatarUrl)
+    && (!isStandaloneDeployment() || new URL(avatarUrl, window.location.href).origin === window.location.origin)
+    ? avatarUrl : null;
   // Load failure belongs to one URL: a new URL gets a fresh attempt.
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
 

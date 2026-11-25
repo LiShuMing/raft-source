@@ -1,3 +1,4 @@
+import { isStandaloneMode } from "../config/deploymentMode";
 import { agentReadinessForViewer, loadComputerReadinessInputs, loadMemberDisplayNames, readinessAgentOwnerUserId, readinessViewerForRole, type ComputerReadinessInputs } from "../services/runtimeReadinessService";
 import { AgentLoungeAgentNotFoundError, openOrCreateAgentLounge } from "../services/agentLoungeService";
 import { mcpAgentOwnerUserId } from "../services/managedMcpConnectionOwnership";
@@ -1778,6 +1779,10 @@ agentRouter.post("/", async (req, res) => {
     const { name, description, model, runtime, reasoningEffort, machineId, envVars, avatarUrl, actionCardMessageId, actionCardConfirmationVersion } = req.body;
     let { runtimeConfig, formDefinitionRef } = req.body;
     const external = req.body?.external === true;
+    if (isStandaloneMode() && !external && !machineId) {
+      res.status(400).json({ code: "execution_machine_required", error: "Select the Computer that will execute this agent" });
+      return;
+    }
     let v2Submitted = false;
     let v2SubmittedReasoningEffort: unknown = null;
     if (!external) {

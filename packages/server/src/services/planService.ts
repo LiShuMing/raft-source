@@ -7,6 +7,7 @@ import { activeAppSumoGrantsQuery } from "./appSumoLicenseService";
 import { getActivePrepaidGrants } from "./prepaidProService";
 import { isChannelReadOnlyByJointLimit } from "./jointChannelLimitState";
 import { getExternalFreezeOfChannel } from "./externalChannelFreezeState";
+import { resolveEffectiveStandalonePlan } from "../standalone/plan";
 import { servers, agents, machines, channels, channelHumans, serverMembers, subscriptions } from "../db/schema";
 import {
   AGENT_LIMIT_REACHED_CODE,
@@ -59,7 +60,7 @@ export function setBeforeServerResourceLockQueryForTest(
 
 /** A server row's plan; a missing row counts as Free. getServerPlan and the search history window both read it here. */
 function serverPlanOf(row: { plan: ServerPlan } | undefined): ServerPlan {
-  return row?.plan ?? "free";
+  return resolveEffectiveStandalonePlan(row?.plan ?? "free");
 }
 
 /** Read the compatibility projection. License lifecycle writers update it under the server row lock.
@@ -102,7 +103,7 @@ function projectServerBillingEntitlement(
     hasInternalEntitlement,
   } = resolveServerBillingPlanSource(
     {
-      serverPlan: row?.serverPlan,
+      serverPlan: resolveEffectiveStandalonePlan(row?.serverPlan ?? "free"),
       subscriptionPlan: row?.subscriptionPlan,
       subscriptionStatus: row?.status,
     },
@@ -457,7 +458,7 @@ export async function countMachines(serverId: string): Promise<number> {
  * Returns undefined if unlimited (no filter needed).
  */
 export function getHistoryCutoff(plan: ServerPlan, now: Date = new Date()): Date | undefined {
-  const days = getEffectiveLimits(plan, now).messageHistoryDays;
+  const days = getEffectiveLimits(resolveEffectiveStandalonePlan(plan), now).messageHistoryDays;
   if (days === -1) return undefined;
   const cutoff = new Date(now);
   cutoff.setDate(cutoff.getDate() - days);

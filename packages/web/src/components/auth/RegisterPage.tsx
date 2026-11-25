@@ -36,6 +36,7 @@ export default function RegisterPage({ onSwitchToLogin, previewProviders }: Regi
     loading: providersLoading,
     expectedCount: expectedProviderCount,
     deploymentUserLimitReached,
+    standalone,
   } = useAuthProviders();
   const enabledProviders = previewProviders ?? configuredProviders;
   const [email, setEmail] = useState("");
@@ -112,7 +113,10 @@ export default function RegisterPage({ onSwitchToLogin, previewProviders }: Regi
   return (
     <AuthPageFrame>
       <div className="w-full">
-        <AuthPageIntro title={formatMessage({ id: "pages.register.title" })} />
+        <AuthPageIntro
+          title={formatMessage({ id: standalone ? "auth.local.registerTitle" : "pages.register.title" })}
+          description={standalone ? formatMessage({ id: "auth.local.registerDescription" }) : undefined}
+        />
 
         {error ? <Banner intent="warning" className="mb-4">{error}</Banner> : null}
         {/* Signing up still works at the limit: only joining a server as one more person is refused. */}

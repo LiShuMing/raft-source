@@ -28,7 +28,11 @@ test("deprecated runtimes keep a v2 form, labelled edit-only; the rest are creat
     assert.equal(buildRuntimeFormV2(runtimeId).schemaVersion, `${runtimeId}.edit.v1`, runtimeId);
   }
   for (const runtimeId of ["opencode", "codex", "grok", "claude", "cursor", "pi", "antigravity"]) {
-    assert.equal(buildRuntimeFormV2(runtimeId).schemaVersion, `${runtimeId}.create.v1`, runtimeId);
+    assert.equal(
+      buildRuntimeFormV2(runtimeId).schemaVersion,
+      runtimeId === "claude" ? "claude.create.v2" : `${runtimeId}.create.v1`,
+      runtimeId,
+    );
   }
 });
 

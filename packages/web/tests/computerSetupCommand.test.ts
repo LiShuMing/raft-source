@@ -386,3 +386,10 @@ test("the install channel Add Computer's pairing names is the channel its one-pa
   const prod = getComputerCommands("acme", "production", undefined, { pairingId: "x" })!.installAndSetup!;
   assert.ok(prod.includes("--pair=x") && !prod.includes("--channel"));
 });
+
+test("self-hosted setup commands keep the supplied origin without a hosted deployment label", () => {
+  const commands = getComputerCommands("local-workspace", undefined, "http://localhost:65124");
+  assert.ok(commands);
+  assert.ok(commands.setup.includes("--server-url http://localhost:65124"));
+  assert.ok(commands.installAndSetup?.includes("--server-url http://localhost:65124"));
+});

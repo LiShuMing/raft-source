@@ -204,7 +204,9 @@ export async function prepareClaudeOarLaunch(
     }
   }
 
-  const model = launchFields.model === "default" ? null : (nonEmpty(launchFields.model) ?? "sonnet");
+  const model = hydrated.model.kind === "machine" || launchFields.model === "default"
+    ? null
+    : (nonEmpty(launchFields.model) ?? "sonnet");
   const serviceTier = launchFields.mode.kind === "fast" ? "fast" : null;
 
   return genericOarLaunch("claude", runtime, installation, ctx, spawnEnv as NodeJS.ProcessEnv, {

@@ -802,6 +802,8 @@ export interface AgentModelSeenItem {
 export const MODEL_SEEN_MAX_ITEMS_PER_REPORT = 50;
 
 export const DAEMON_CAPABILITY_MODEL_SEEN_BOUNDARY = "agent:model-seen-boundary";
+/** The Computer understands Claude's machine model policy and omits --model. */
+export const DAEMON_CAPABILITY_CLAUDE_MACHINE_SETTINGS = "claude:machine-settings-v1";
 
 /**
  * Task v2: the daemon attests what the model has seen of a source message's
@@ -3520,7 +3522,8 @@ export type RuntimeModelConfig =
        */
       contextWindow?: number;
       maxOutputTokens?: number;
-    };
+    }
+  | { kind: "machine" };
 
 /** #proj-runtime:#50: bounds for a custom model's declared limits, in tokens. */
 export const CUSTOM_MODEL_CONTEXT_WINDOW_MAX = 10_000_000;
@@ -5728,6 +5731,11 @@ function runtimeConfigError(reason: RuntimeConfigParseReason, error: string, run
 function parseStrictModelConfig(runtime: string, value: unknown): RuntimeModelConfig | string {
   if (!isPlainRecord(value)) return "runtimeConfig.model must be an object";
   if (hasUnknownFields(value, MODEL_CONFIG_FIELDS)) return "runtimeConfig.model contains unknown fields";
+  if (value.kind === "machine") {
+    return runtime === "claude" && Object.keys(value).length === 1
+      ? { kind: "machine" }
+      : "runtimeConfig.model machine is only supported for Claude without a model override";
+  }
   if (value.kind === "custom") {
     if (typeof value.name !== "string" || !value.name.trim()) return "runtimeConfig.model.name is required";
     const limits = parseCustomModelLimits(runtime, value);
@@ -6057,6 +6065,9 @@ export function parseRuntimeConfig(input: RuntimeConfigHydrationInput): RuntimeC
         : "invalid_provider";
     return runtimeConfigError(reason, provider, runtime, rawProviderKind);
   }
+  if (model.kind === "machine" && (provider?.kind !== "default" || mode.kind !== "default" || raw.reasoningEffort != null)) {
+    return runtimeConfigError("invalid_model", "Machine settings cannot be combined with provider, mode or reasoning overrides", runtime, rawProviderKind);
+  }
   if (runtime === "builtin" && provider?.kind === "preset") {
     if (model.kind === "custom" && isBuiltInRuntimeCustomModelPresetProviderId(provider.providerId)) {
       model = normalizeBuiltInPresetCustomModel(provider.providerId, model);
@@ -6104,7 +6115,7 @@ export function parseRuntimeConfig(input: RuntimeConfigHydrationInput): RuntimeC
     }
   }
 
-  const reasoningEffort = parseStrictReasoningEffortConfig(runtime, raw.reasoningEffort ?? input.reasoningEffort ?? null);
+  const reasoningEffort = parseStrictReasoningEffortConfig(runtime, model.kind === "machine" ? null : raw.reasoningEffort ?? input.reasoningEffort ?? null);
   if (!reasoningEffort.ok) {
     return runtimeConfigError(reasonForValidationError(reasoningEffort.error), reasoningEffort.error, runtime, rawProviderKind);
   }
@@ -6138,6 +6149,7 @@ export function parseRuntimeConfig(input: RuntimeConfigHydrationInput): RuntimeC
 }
 
 export function runtimeConfigModelValue(config: RuntimeConfig): string {
+  if (config.model.kind === "machine") return "";
   return config.model.kind === "custom" ? config.model.name : config.model.id;
 }
 

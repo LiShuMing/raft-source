@@ -74,7 +74,7 @@ function assertSameAsLegacy(v2: Record<string, unknown>, legacy: RuntimeConfig, 
   assert.equal(JSON.stringify(parsed.config), JSON.stringify(legacy), message);
 }
 
-const MODEL_RUNTIMES = ["opencode", "kimi", "gemini"] as const;
+const MODEL_RUNTIMES = ["kimi", "gemini"] as const;
 
 test("each batch-2 form: fields, order, advanced envVars, no requiredClientCapabilities", () => {
   for (const runtime of MODEL_RUNTIMES) {
@@ -171,7 +171,7 @@ test("antigravity: edit keeps the stored model and effort and a stored null effo
   for (const config of stored) {
     const values = runtimeFormValuesFromRuntimeConfig(config);
     assert.deepEqual(values, {
-      model: config.model.kind === "custom" ? config.model.name : config.model.id,
+      model: config.model.kind === "custom" ? config.model.name : config.model.kind === "preset" ? config.model.id : "",
       reasoningEffort: config.reasoningEffort ?? "",
       envVars: config.envVars ?? {},
     });
@@ -347,8 +347,8 @@ const staticSelect = (runtime: string) => ({
   defaultValue: RUNTIME_MODELS[runtime]?.[0]?.id ?? "",
 });
 
-test("opencode and kimi: a live probe is the select; every non-live outcome, offline machine or probe failure falls back to the static list", async () => {
-  for (const runtime of ["opencode", "kimi"]) {
+test("kimi: a live probe is the select; every non-live outcome, offline machine or probe failure falls back to the static list", async () => {
+  for (const runtime of ["kimi"]) {
     const entry = runtimeFormV2Entry(runtime)!;
     const live = optionSourceContext(async () => ({
       kind: "live",
@@ -432,4 +432,19 @@ test("antigravity: an edit keeps working once the saved model lists no levels; o
   // A model that lists levels still refuses one it does not list, saved or not.
   const pro = { ...existing, model: { kind: "preset", id: "gemini-4-pro" }, reasoningEffort: "medium" } as RuntimeConfig;
   assert.equal((await check({ model: "gemini-4-pro", reasoningEffort: "medium" }, pro)).kind, "rejected");
+});
+
+test("OpenCode uses host defaults without model selection or a model probe", async () => {
+  const form = parseRuntimeFormV2(wire(buildRuntimeFormV2("opencode")))!;
+  assert.deepEqual(form.fields.map(field => field.key), ["envVars"]);
+  assert.deepEqual(runtimeFormV2Entry("opencode")!.validateProjection(), []);
+  const { context, calls } = optionSourceContext(async () => { throw new Error("must not probe"); });
+  assert.deepEqual(await runtimeFormV2Entry("opencode")!.resolveOptionSource(context), { kind: "source", source: null });
+  assert.deepEqual(calls, []);
+  for (const values of [{}, { model: "stale/provider-model" }]) {
+    const config = submitted("opencode", { ...values, envVars: { KEEP: "1" } });
+    assert.deepEqual(config.model, { kind: "preset", id: "default" });
+    assert.deepEqual(config.envVars, { KEEP: "1" });
+    assert.deepEqual(runtimeFormValuesFromRuntimeConfig(config), { envVars: { KEEP: "1" } });
+  }
 });

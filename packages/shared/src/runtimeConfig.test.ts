@@ -1370,7 +1370,7 @@ test("an OpenRouter custom name keeps its model identity with and without limits
     return parsed.config.model;
   };
   /** The OpenRouter API id a parsed model runs: a custom name, or a preset catalog id minus Raft's one prefix. */
-  const apiId = (model: ReturnType<typeof parse>) => model.kind === "custom" ? model.name : model.id.slice("openrouter/".length);
+  const apiId = (model: ReturnType<typeof parse>) => model.kind === "custom" ? model.name : model.kind === "preset" ? model.id.slice("openrouter/".length) : "";
 
   // The counterexample, verbatim: openrouter/auto with a limit, then without.
   const limited = parse({ kind: "custom", name: "openrouter/auto", maxOutputTokens: 2048 });

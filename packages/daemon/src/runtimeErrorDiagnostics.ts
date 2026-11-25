@@ -31,6 +31,7 @@ const RUNTIME_AUTH_ACTION_REQUIRED_PATTERNS: RegExp[] = [
   /log in first/i,
   /please log in/i,
   /authentication failed/i,
+  /\bfailed to authenticate\b/i,
   /auth(?:entication)? failed/i,
   /authentication timed out/i,
   /missing (?:api )?token/i,
@@ -63,6 +64,9 @@ const RUNTIME_BILLING_EXHAUSTED_PATTERNS: RegExp[] = [
 // included in your plan" (#proj-raft-computer:#46, reconciler step 4a): the
 // plan, not a limit that waiting ends, so it is the same plan-access fact.
 const RUNTIME_PLAN_ACCESS_PATTERNS: RegExp[] = [
+  // Local gateways can reject a model independently of account authentication.
+  // Require the explicit model-access wording; a generic 403 is not enough.
+  /该模型需要授权\s*[,，:]\s*model\s*:\s*[^\s"{},]+/i,
   /\busage not included in your plan\b/i,
   /\b(?:subscription|plan|tier)\b[^.\n]{0,80}\b(?:does not|doesn't|do not|don't|not)\b[^.\n]{0,40}\b(?:include|allow|support|grant)\b[^.\n]{0,40}\b(?:access|model)\b/i,
   /\b(?:model|access)\b[^.\n]{0,80}\b(?:not|isn't|is not)\b[^.\n]{0,20}\b(?:included|available|enabled|allowed)\b[^.\n]{0,40}\b(?:subscription|plan|tier)\b/i,

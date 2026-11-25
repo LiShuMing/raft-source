@@ -142,7 +142,7 @@ export function getComputerCommands(
     ? STAGING_COMPUTER_SERVER_URL
     : deploymentEnv === "slockdev"
       ? serverUrl
-      : null;
+      : isDefaultComputerServerUrl(serverUrl) ? null : serverUrl;
   const serverUrlArg = commandServerUrl ? ` --server-url ${commandServerUrl}` : "";
   const machineArg = options.machineId ? ` --machine ${options.machineId}` : "";
   const setupArgs = `${serverUrlArg}${machineArg}`;
