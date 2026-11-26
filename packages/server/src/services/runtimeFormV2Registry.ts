@@ -989,6 +989,12 @@ export interface ReasoningModelFormOptions {
    */
   retiredRuntimeChoice?: string;
   /**
+   * Prepend a host-default option (e.g. Antigravity's `default` = "Configured
+   * Default / Auto") ahead of live probe results and preselect it on create,
+   * while keeping all live models and their effort menus selectable.
+   */
+  defaultHostChoice?: RuntimeModelInfo;
+  /**
    * No bundled list, a typed model allowed: when the Computer's list cannot be
    * read, the source is a `fallback` with no options (a typed model id still
    * submits), not `unavailable` (which blocks a required field).
@@ -1585,7 +1591,11 @@ function reasoningModelFormEntry(runtimeId: string, options: ReasoningModelFormO
       const probe = await probeModels(context, runtimeId);
       if (probe.kind === "handled") return { kind: "handled" };
       if (probe.kind === "live") {
-        return { kind: "source", source: reasoningModelOptionSource(runtimeId, probe.models, probe.default, null, options, probe.unavailable) };
+        const models = options.defaultHostChoice && !probe.models.some((model) => model.id === options.defaultHostChoice!.id)
+          ? [options.defaultHostChoice, ...probe.models]
+          : probe.models;
+        const defaultModel = options.defaultHostChoice?.id ?? probe.default;
+        return { kind: "source", source: reasoningModelOptionSource(runtimeId, models, defaultModel, null, options, probe.unavailable) };
       }
       const fallback = reasoningModelOptionSource(runtimeId, RUNTIME_MODELS[runtimeId] ?? [], undefined, probe.reason, options);
       return {
@@ -1681,6 +1691,9 @@ function reasoningModelFormEntry(runtimeId: string, options: ReasoningModelFormO
       const model = options.customModel && !bundledIds().has(modelValue)
         ? { kind: "custom", name: modelValue }
         : { kind: "preset", id: modelValue };
+      const reasoningEffort = options.defaultHostChoice && modelValue === options.defaultHostChoice.id
+        ? null
+        : typeof effort === "string" && effort.trim() !== "" ? effort.trim() : null;
       return {
         ok: true,
         runtimeConfig: {
@@ -1689,7 +1702,7 @@ function reasoningModelFormEntry(runtimeId: string, options: ReasoningModelFormO
           ...(provider ? { provider } : {}),
           model,
           mode,
-          reasoningEffort: typeof effort === "string" && effort.trim() !== "" ? effort.trim() : null,
+          reasoningEffort,
           envVars,
           ...(typeof command === "string" && command.trim() ? { command: command.trim() } : {}),
         },
@@ -1862,20 +1875,19 @@ const dshEntry = reasoningModelFormEntry("dsh", {
   modelHint: "Models DeepSeek Harness can use on this computer, as provider/model. You can also type one. Set its DeepSeek API key in dsh's own settings on the computer, or as DEEPSEEK_API_KEY under Environment Variables.",
 });
 
-// Antigravity on the OAR host: the models the Computer's `agy` login offers
-// (OAR listModels), a typed id allowed (also when the list cannot be read).
-// A model is required (#oar-raft:#25): the one agy starts on (the live list's
-// default) is preselected. "AGY configured default" (`default`, no model
-// passed) is no longer offered; an agent that stored it keeps running until
-// someone edits it, and its edit form asks for a model. The effort is agy's
-// thought level, offered only for a model whose levels the Computer listed;
-// OAR applies it as the session's `effort`. A model id that already names its
-// level carries none (the daemon drops it).
+// Antigravity on the OAR host: defaults to "Configured Default / Auto" (`default`,
+// reusing the Computer's own `agy` default model, auth, rules, MCP and skills
+// without passing --model/--effort), while offering the Computer's live `agy`
+// model list + effort menus and custom typed model IDs.
 const antigravityEntry = reasoningModelFormEntry("antigravity", {
   customModel: true,
   fastMode: false,
   reasoning: true,
-  retiredRuntimeChoice: ANTIGRAVITY_AGY_CHOOSES_MODEL,
+  defaultHostChoice: {
+    id: ANTIGRAVITY_AGY_CHOOSES_MODEL,
+    label: "Configured Default / Auto",
+    supportedReasoningEfforts: [],
+  },
   typedModelWhenUnlisted: true,
   modelHint: "Models available to this computer's Antigravity login; the one Antigravity starts on is preselected. You can also type a model ID.",
 });

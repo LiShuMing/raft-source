@@ -7,6 +7,7 @@ import type { RuntimeModelSourceOutcome } from "@botiverse/raft-shared";
 
 import { loadOarRuntime } from "../oarLoader";
 import { detectModelSourceViaOar } from "../runtimeModels/oarListModels";
+import { resolveAntigravityAcpCommand } from "./antigravityAcpCommand";
 import { ANTIGRAVITY_ENV_OVERRIDES, resolveAntigravitySpawn } from "./index";
 import { resolveCommandOnPathAsync } from "./probe";
 
@@ -120,9 +121,10 @@ export async function detectAntigravityModelSource(
   } catch {
     return { kind: "error", retryable: false, code: "detect_failed" };
   }
+  const acpCommand = resolveAntigravityAcpCommand(command);
   return detectModelSourceViaOar({
     lister,
-    installation: { kind: "available", via: "executable", command },
+    installation: { kind: "available", via: "executable", command: acpCommand },
     deadlineMs: deps.deadlineMs ?? ANTIGRAVITY_MODEL_DETECTION_DEADLINE_MS,
     label: (entry: ModelEntry) => entry.displayName ?? entry.id,
     keepReasoningEfforts: true,

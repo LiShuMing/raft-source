@@ -115,7 +115,7 @@
     }
   },
   "values": {
-    "model": "",
+    "model": "default",
     "reasoningEffort": "",
     "envVars": {
       "EXAMPLE_FLAG": "1"

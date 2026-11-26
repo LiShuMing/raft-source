@@ -5130,11 +5130,12 @@ export const RUNTIME_MODELS: Record<string, RuntimeModelInfo[]> = {
       verified: "launchable",
     },
   ],
-  // No bundled list: the models are the Computer's `agy` login's (OAR
-  // listModels), and one must be chosen (#oar-raft:#25). The old "AGY
-  // configured default" (`default`, no model passed) is gone from pickers;
-  // agents that stored it keep running (getDefaultModel, the daemon's launch).
-  antigravity: [],
+  // Host-default choice lets Antigravity reuse the Computer's own `agy` model,
+  // auth, rules, MCP, and skills without passing --model/--effort, while live
+  // OAR probing adds the Computer's full model list and effort menus.
+  antigravity: [
+    { id: "default", label: "Configured Default / Auto", supportedReasoningEfforts: [], verified: "suggestion_only" },
+  ],
   copilot: [
     { id: "gpt-5.4", label: "GPT-5.4" },
     { id: "gpt-5.2", label: "GPT-5.2" },

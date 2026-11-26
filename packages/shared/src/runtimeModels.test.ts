@@ -269,11 +269,12 @@ test("runtime-reported unavailable models are validated, de-duplicated and lengt
   assert.equal(sanitizeRuntimeModelUnavailable(Array.from({ length: 80 }, (_, i) => ({ id: `m${i}`, label: "", reason: "" })))!.length, 50);
 });
 
-test("Antigravity has no bundled models: a model only the Computer lists is left to its live list", () => {
-  assert.deepEqual(RUNTIME_MODELS.antigravity, []);
+test("Antigravity offers host configured default and leaves explicit models to the Computer's live list", () => {
+  assert.deepEqual(RUNTIME_MODELS.antigravity, [
+    { id: "default", label: "Configured Default / Auto", supportedReasoningEfforts: [], verified: "suggestion_only" },
+  ]);
   assert.ok(allowedReasoningEffortsForModel("antigravity", "gemini-3.8-flash").includes("high"));
   assert.ok(allowedReasoningEffortsForModel("claude", "claude-unlisted").includes("high"), "other runtimes keep the base set");
-  // #oar-raft:#25: an agent stored with agy's own choice keeps it, never Claude's default.
   assert.equal(getDefaultModel("antigravity"), ANTIGRAVITY_AGY_CHOOSES_MODEL);
   const parsed = parseRuntimeConfig({
     runtimeConfig: { version: 1, runtime: "antigravity", model: { kind: "preset", id: "default" }, mode: { kind: "default" }, reasoningEffort: null, envVars: null },

@@ -24,6 +24,7 @@
 
 import type { InstallationSnapshot } from "@botiverse/oar";
 import { hydrateRuntimeConfig, runtimeConfigToLaunchFields } from "@botiverse/raft-shared";
+import { resolveAntigravityAcpCommand } from "../drivers/antigravityAcpCommand";
 import { prepareAntigravityEnvironment, resolveAntigravitySpawn } from "../drivers/index";
 import type { SpawnContext } from "../drivers/types";
 import { loadOarRuntime } from "../oarLoader";
@@ -82,12 +83,13 @@ export async function resolveAntigravityOarCommand(
     installation = null;
   }
   if (installation?.kind === "available" && installation.via === "executable") {
-    return installation.command;
+    return resolveAntigravityAcpCommand(installation.command);
   }
   if (installation?.kind === "unsupported") {
     throw new OarLaunchDeclined(`antigravity_installation_unsupported:${installation.code ?? "unsupported"}`);
   }
-  return (deps.fallbackResolve ?? (() => resolveAntigravitySpawn([]).command))();
+  const fallback = (deps.fallbackResolve ?? (() => resolveAntigravitySpawn([]).command))();
+  return resolveAntigravityAcpCommand(fallback);
 }
 
 export async function prepareAntigravityOarLaunch(ctx: SpawnContext): Promise<OarLaunch> {

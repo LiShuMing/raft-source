@@ -185,15 +185,14 @@ test("antigravity: edit keeps the stored model and effort and a stored null effo
   );
 });
 
-// #oar-raft:#25: a model is required; "AGY configured default" (`default`) is retired.
-test("antigravity: a stored 'AGY configured default' shows no model on edit, and saving it is refused", () => {
+test("antigravity: host configured default round-trips cleanly and clears effort overrides", () => {
   const legacy = legacyRuntimeConfig("antigravity", "default", { OLD: "1" });
-  assert.deepEqual(runtimeFormValuesFromRuntimeConfig(legacy), { model: "", reasoningEffort: "", envVars: { OLD: "1" } });
-  assert.deepEqual(
-    buildRuntimeConfigFromFormValues("antigravity", { model: "default", reasoningEffort: "" }),
-    { ok: false, issue: { code: "model_required", pointer: "/formValues/model" } },
-  );
-  // A model picked on edit is stored as usual.
+  assert.deepEqual(runtimeFormValuesFromRuntimeConfig(legacy), { model: "default", reasoningEffort: "", envVars: { OLD: "1" } });
+  const kept = submitted("antigravity", { model: "default", reasoningEffort: "high", envVars: { OLD: "1" } }) as unknown as RuntimeConfig;
+  assert.deepEqual(kept.model, { kind: "preset", id: "default" });
+  assert.equal(kept.reasoningEffort, null);
+  assert.deepEqual(kept.envVars, { OLD: "1" });
+  // An explicit model picked on edit is stored as usual.
   const values = { model: "gemini-3.8-flash", reasoningEffort: "", envVars: { OLD: "1" } };
   assert.deepEqual((submitted("antigravity", values, { editing: true, existing: legacy }) as unknown as RuntimeConfig).model, { kind: "custom", name: "gemini-3.8-flash" });
 });
@@ -209,7 +208,7 @@ const AGY_LIVE: RuntimeModelSourceOutcome = {
   },
 };
 
-test("antigravity: the Computer's agy models, the one agy starts on preselected, with efforts only where agy lists them", async () => {
+test("antigravity: offers host configured default first alongside the Computer's live agy models and efforts", async () => {
   const entry = runtimeFormV2Entry("antigravity")!;
   const live = optionSourceContext(async () => AGY_LIVE);
   const resolution = await entry.resolveOptionSource(live.context as RuntimeFormOptionSourceContext);
@@ -218,19 +217,22 @@ test("antigravity: the Computer's agy models, the one agy starts on preselected,
   const source = (resolution as unknown as { source: Record<string, unknown> }).source;
   assert.equal(source.status, "live");
   assert.equal(source.customValueAllowed, true);
-  // #oar-raft:#25: no "AGY configured default"; agy's own default model is preselected.
-  assert.equal(source.defaultValue, "gemini-3.8-flash");
+  assert.equal(source.defaultValue, "default");
   assert.deepEqual(source.options, [
+    { value: "default", label: "Configured Default / Auto", supportedReasoningEfforts: [], reasoningEffortNone: true },
     { value: "gemini-3.8-flash", label: "Gemini 3.8 Flash", supportedReasoningEfforts: ["low", "medium", "high"], defaultReasoningEffort: "medium" },
     // A model agy lists no levels for (or whose id names its level) offers no effort.
     { value: "gemini-4-carbon-medium", label: "Gemini 4 Carbon (Medium)", supportedReasoningEfforts: [] },
   ]);
 
-  // Not live: no list, a typed model id still allowed; a fallback, so the required field takes it (unavailable would block).
+  // Not live: keeps host configured default selectable and allows a typed model id.
   const offline = optionSourceContext(async () => { throw new Error("must not probe"); }, "not_routed");
   const fallback = await entry.resolveOptionSource(offline.context as RuntimeFormOptionSourceContext);
   const fallbackSource = (fallback as unknown as { source: Record<string, unknown> }).source;
-  assert.deepEqual(fallbackSource.options, []);
+  assert.deepEqual(fallbackSource.options, [
+    { value: "default", label: "Configured Default / Auto", supportedReasoningEfforts: [], reasoningEffortNone: true },
+  ]);
+  assert.equal(fallbackSource.defaultValue, "default");
   assert.equal(fallbackSource.customValueAllowed, true);
   assert.equal(fallbackSource.status, "fallback");
 });
