@@ -303,7 +303,17 @@ Defaults:
 | `RAFT_STANDALONE_PORT` | `5280` |
 | `RAFT_STANDALONE_DIR` | `~/.raft-standalone` |
 | `RAFT_STANDALONE_WEB_DIST` | `packages/web/dist` |
+| `RAFT_STANDALONE_HTML_PREVIEW` | `offline-static` (`local-interactive` enables zero-egress inline JS + bridge) |
+| `RAFT_STANDALONE_CHECKPOINT_INTERVAL_MS` | `1800000` (30 min PGlite WAL `CHECKPOINT`; `0` disables periodic runs) |
 | HTTP origin | `http://127.0.0.1:5280` |
+
+Operations & maintenance helper:
+
+```sh
+node scripts/standalone-ctl.mjs status
+node scripts/standalone-ctl.mjs prune          # dry-run; add --apply to remove stale ephemeral files
+node scripts/standalone-ctl.mjs restart
+```
 
 The profile binds to loopback. It does not turn local file access into anonymous
 remote access. Use email and password to create a local account or sign in; no email

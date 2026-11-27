@@ -1,6 +1,6 @@
 import api from "../../api/client";
 import { useMediaPreviewStore } from "../../store/mediaPreviewStore";
-import type { MediaPreviewCommentContext, MediaPreviewKind } from "../../store/mediaPreviewStore";
+import type { HtmlPreviewMode, MediaPreviewCommentContext, MediaPreviewKind } from "../../store/mediaPreviewStore";
 import type { MessageAttachment } from "../../store/messageStore";
 import { isAttachmentPreviewUnifiedEnabled } from "../../store/attachmentPreviewGate";
 
@@ -27,8 +27,14 @@ export async function openMediaPreview(
   const store = useMediaPreviewStore.getState();
   store.setLoadingId(attachment.id);
   try {
-    const { data } = await api.get<{ url: string }>(ENDPOINT[kind](attachment.id));
-    useMediaPreviewStore.getState().open({ kind, attachment, url: data.url, commentContext: options?.commentContext });
+    const { data } = await api.get<{ url: string; previewMode?: HtmlPreviewMode }>(ENDPOINT[kind](attachment.id));
+    useMediaPreviewStore.getState().open({
+      kind,
+      attachment,
+      url: data.url,
+      ...(kind === "html" && data.previewMode ? { htmlPreviewMode: data.previewMode } : {}),
+      commentContext: options?.commentContext,
+    });
   } catch (err) {
     console.error(`Failed to open ${kind} attachment preview:`, err);
     await options?.onFallbackDownload?.(attachment);

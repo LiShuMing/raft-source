@@ -40,6 +40,10 @@ test("real attachment route serves static HTML with offline CSP while preserving
     uploaderType: "user",
     filename: "report.html",
   });
+  const previewUrlRes = await http.as(owner, server).get(`/api/attachments/${id}/html-preview-url`);
+  assert.equal(previewUrlRes.status, 200);
+  const previewUrlBody = await previewUrlRes.json() as { url: string; previewMode: string };
+  assert.equal(previewUrlBody.previewMode, "offline-static");
   const path = `/api/attachments/${id}/html-preview`;
   assert.equal((await http.as(outsider, server).get(path)).status, 404);
   assert.equal(reads, 0);
@@ -58,4 +62,20 @@ test("real attachment route serves static HTML with offline CSP while preserving
   const policy = await (await fetch(`${app.baseUrl}/api/privacy-policy`)).json();
   assert.equal(policy.htmlPreview, "offline-static");
   assert.equal(policy.externalServices.managedMcp, false);
+
+  // Explicit local-interactive opt-in keeps zero external egress while enabling inline scripts + measurement bridge.
+  vi.stubEnv("RAFT_STANDALONE_HTML_PREVIEW", "local-interactive");
+  const interactiveUrlRes = await http.as(owner, server).get(`/api/attachments/${id}/html-preview-url`);
+  assert.equal(interactiveUrlRes.status, 200);
+  assert.equal((await interactiveUrlRes.json() as { previewMode: string }).previewMode, "sandboxed-interactive");
+  const interactivePreview = await http.as(owner, server).get(path);
+  assert.equal(interactivePreview.status, 200);
+  const interactiveCsp = interactivePreview.headers.get("content-security-policy")!;
+  assert.match(interactiveCsp, /sandbox allow-scripts/);
+  assert.match(interactiveCsp, /connect-src 'none'/);
+  assert.doesNotMatch(interactiveCsp, /https:|allow-same-origin/);
+  const interactiveBody = await interactivePreview.text();
+  assert.match(interactiveBody, /slockAcBridge/);
+  const interactivePolicy = await (await fetch(`${app.baseUrl}/api/privacy-policy`)).json();
+  assert.equal(interactivePolicy.htmlPreview, "local-interactive");
 });

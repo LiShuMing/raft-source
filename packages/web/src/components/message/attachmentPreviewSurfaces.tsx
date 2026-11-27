@@ -772,19 +772,21 @@ export function DocumentAttachmentPreviewModal({
 export function HtmlAttachmentPreviewModal({
   filename,
   url,
+  previewMode,
   onClose,
   onDownload,
   comments,
 }: {
   filename: string;
   url: string;
+  previewMode?: "sandboxed-interactive" | "offline-static";
   onClose: () => void;
   onDownload: () => void;
   comments?: PreviewCommentsContext;
 }) {
   return (
     <AttachmentPreviewShell filename={filename} onClose={onClose} onDownload={onDownload} comments={comments}>
-      <HtmlPreviewBody url={url} filename={filename} commentsEnabled={Boolean(comments)} />
+      <HtmlPreviewBody url={url} filename={filename} previewMode={previewMode} commentsEnabled={Boolean(comments)} />
     </AttachmentPreviewShell>
   );
 }
@@ -875,13 +877,20 @@ export function AudioPreviewBody({
 function HtmlPreviewBody({
   url,
   filename,
+  previewMode,
   commentsEnabled,
 }: {
   url: string;
   filename: string;
+  previewMode?: "sandboxed-interactive" | "offline-static";
   commentsEnabled: boolean;
 }) {
   const { formatMessage } = useIntl();
+  const isOfflineStatic = previewMode === "offline-static";
+  const [staticDocumentReady, setStaticDocumentReady] = useState(false);
+  useEffect(() => {
+    setStaticDocumentReady(false);
+  }, [url, isOfflineStatic]);
   const ctx = useContext(PreviewCommentModeContext);
   const commentMode = commentsEnabled && (ctx?.commentMode ?? false);
   const [pendingExternalLink, setPendingExternalLink] = useState<AttachmentPreviewExternalLink | null>(null);
@@ -904,7 +913,16 @@ function HtmlPreviewBody({
     buildSrc,
     activateDocument,
   } = useAttachmentPreviewBridge();
+  const previewReady = isOfflineStatic ? staticDocumentReady : externalLinksReady;
   const handlePreviewDocumentLoad = useCallback(() => {
+    // Standalone serves offline-static HTML with scripts and external links
+    // stripped (`script-src 'none'`), so no bridge script runs inside the
+    // iframe. Release the loading veil as soon as the iframe finishes loading.
+    if (isOfflineStatic) {
+      setStaticDocumentReady(true);
+      updatePendingExternalLink(null);
+      return;
+    }
     // The iframe node is stable across hostile top-level self-navigation, but
     // its parent-owned link actions are document-scoped. Retire both bridge
     // inventory and any blocked-popup fallback until this document reports a
@@ -912,7 +930,7 @@ function HtmlPreviewBody({
     activateDocument();
     updatePendingExternalLink(null);
     lastExternalLinkAttemptAtRef.current = Number.NEGATIVE_INFINITY;
-  }, [activateDocument, updatePendingExternalLink]);
+  }, [activateDocument, isOfflineStatic, updatePendingExternalLink]);
   const externalLinkHotspots = useMemo(() => externalLinks.flatMap((candidate, linkIndex) => {
     const validated = validateAttachmentPreviewExternalLink(candidate.href, window.location.origin);
     if (!validated.ok) return [];
@@ -1032,14 +1050,14 @@ function HtmlPreviewBody({
           identity/target, never content access. */}
       <SandboxedPreviewFrame
         title={formatMessage({ id: "message.messageItem.htmlPreviewTitle" }, { filename })}
-        src={buildSrc(url)}
-        sandbox="allow-scripts"
+        src={isOfflineStatic ? url : buildSrc(url)}
+        sandbox={isOfflineStatic ? "" : "allow-scripts"}
         referrerPolicy="no-referrer"
-        className={`h-full w-full border-0 bg-sticker-paper${externalLinksReady ? "" : " pointer-events-none"}`}
+        className={`h-full w-full border-0 bg-sticker-paper${previewReady ? "" : " pointer-events-none"}`}
         frameRef={iframeRef}
         onLoad={handlePreviewDocumentLoad}
       />
-      {!externalLinksReady ? (
+      {!previewReady ? (
         <div
           role="status"
           data-message-affordance="attachment-preview-external-links-loading"
@@ -1050,7 +1068,7 @@ function HtmlPreviewBody({
           </div>
         </div>
       ) : null}
-      {externalLinksReady ? (
+      {!isOfflineStatic && externalLinksReady ? (
         <div
           data-message-affordance="attachment-preview-external-link-hotspots"
           className="pointer-events-none absolute inset-0 z-raised overflow-hidden"

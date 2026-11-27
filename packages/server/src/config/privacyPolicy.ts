@@ -1,4 +1,5 @@
 import { isStandaloneMode } from "./deploymentMode";
+import { getStandaloneHtmlPreviewMode } from "../standalone/htmlPreview";
 
 export function requireExternalService(service: string, env: NodeJS.ProcessEnv = process.env): void {
   if (isStandaloneMode(env)) {
@@ -11,7 +12,7 @@ export function getPrivacyPolicy(env: NodeJS.ProcessEnv = process.env) {
   const standalone = isStandaloneMode(env);
   return {
     deploymentMode: standalone ? "standalone" : "standard",
-    htmlPreview: standalone ? "offline-static" : "sandboxed-interactive",
+    htmlPreview: standalone ? getStandaloneHtmlPreviewMode(env) : "sandboxed-interactive",
     externalServices: Object.fromEntries([
       "vendorUpdates", "productFeedback", "messageTranslation", "pushNotifications", "appWebhooks", "managedMcp",
     ].map((service) => [service, !standalone])),

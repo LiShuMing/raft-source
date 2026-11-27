@@ -1398,6 +1398,17 @@ export function getBoundedAuthDb(timeoutMs: number): Database | null {
  * `closePglite` (tests only) closes the PGlite connection in place of its close(): test databases
  * close once nothing uses them (src/test/integration/pgliteClose.ts).
  */
+/**
+ * Run a `CHECKPOINT` on the active PGlite instance (no-op on standard PostgreSQL).
+ * Standalone PGlite runs without a background checkpointer, so periodic and
+ * shutdown checkpoints prevent `pg_wal` segments from growing unboundedly.
+ */
+export async function checkpointPgliteDatabase(): Promise<boolean> {
+  if (!_pglite) return false;
+  await _pglite.exec("CHECKPOINT");
+  return true;
+}
+
 export async function closeDatabase(options: {
   afterBackgroundWork?: () => Promise<"detach" | void>;
   closePglite?: (client: PGlite) => Promise<void>;
@@ -1419,7 +1430,10 @@ export async function closeDatabase(options: {
       const client = _pglite!;
       if (detach && !errors.length) detached = client;
       else if (options.closePglite) await options.closePglite(client);
-      else await client.close();
+      else {
+        await client.exec("CHECKPOINT").catch(() => {});
+        await client.close();
+      }
     }] : []),
   ];
   try {

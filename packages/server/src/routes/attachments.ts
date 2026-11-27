@@ -1,5 +1,10 @@
 import { isStandaloneMode } from "../config/deploymentMode";
-import { offlineHtmlPreviewCsp, readOfflineHtmlPreview } from "../standalone/htmlPreview";
+import {
+  getStandaloneHtmlPreviewMode,
+  localInteractiveHtmlPreviewCsp,
+  offlineHtmlPreviewCsp,
+  readOfflineHtmlPreview,
+} from "../standalone/htmlPreview";
 import { DmPeerNotMemberError } from "../services/dmSendPolicy";
 import { Router, type NextFunction, type Request, type Response, type Router as RouterType } from "express";
 import { UUID_RE } from "../lib/messageId";
@@ -714,7 +719,11 @@ export function buildAttachmentInlinePreviewContentSecurityPolicy(frameAncestorO
 }
 
 export function buildHtmlPreviewContentSecurityPolicy(frameAncestorOrigins = getPreviewFrameAncestorOrigins()): string {
-  if (isStandaloneMode()) return offlineHtmlPreviewCsp(frameAncestorOrigins);
+  if (isStandaloneMode()) {
+    return getStandaloneHtmlPreviewMode() === "local-interactive"
+      ? localInteractiveHtmlPreviewCsp(frameAncestorOrigins)
+      : offlineHtmlPreviewCsp(frameAncestorOrigins);
+  }
   const frameAncestors = ["'self'", ...frameAncestorOrigins].join(" ");
   return [
     "default-src 'none'",
@@ -1418,7 +1427,14 @@ attachmentPublicRouter.get("/:id/html-preview-url", async (req, res) => {
     }
 
     const { url, expiresAt } = buildHtmlPreviewUrl(req, attachment);
-    res.json({ url: url.toString(), expiresAt });
+    const previewMode = isStandaloneMode() && getStandaloneHtmlPreviewMode() === "offline-static"
+      ? "offline-static"
+      : "sandboxed-interactive";
+    res.json({
+      url: url.toString(),
+      expiresAt,
+      previewMode,
+    });
   } catch (err) {
     sendJsonServerError(req, res, { error: "Failed to get HTML preview URL", logPrefix: "[Attachments] Failed to url attachment", err });
   }
@@ -1488,7 +1504,8 @@ attachmentPublicRouter.get("/:id/html-preview", async (req, res) => {
     }
 
     const stream = await storage.get(attachment.storageKey);
-    const offlineHtml = isStandaloneMode() ? await readOfflineHtmlPreview(stream) : undefined;
+    const useOfflineStatic = isStandaloneMode() && getStandaloneHtmlPreviewMode() === "offline-static";
+    const offlineHtml = useOfflineStatic ? await readOfflineHtmlPreview(stream) : undefined;
     if (offlineHtml === null) {
       res.status(413).json({ error: "Offline HTML previews are limited to 2 MiB. Download the original file instead." });
       return;

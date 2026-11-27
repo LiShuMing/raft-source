@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { Readable } from "node:stream";
 import { parse } from "parse5";
-import { sanitizeOfflineHtml, readOfflineHtmlPreview, OFFLINE_HTML_PREVIEW_MAX_BYTES, offlineHtmlPreviewCsp } from "./htmlPreview";
+import {
+  getStandaloneHtmlPreviewMode,
+  localInteractiveHtmlPreviewCsp,
+  OFFLINE_HTML_PREVIEW_MAX_BYTES,
+  offlineHtmlPreviewCsp,
+  readOfflineHtmlPreview,
+  sanitizeOfflineHtml,
+} from "./htmlPreview";
 
 test("offline previews preserve report content and remove script, navigation and remote attributes", () => {
   const html = sanitizeOfflineHtml(`<!doctype html><html><head>
@@ -54,4 +61,17 @@ test("offline preview streams have a byte limit and keep UTF-8 split across chun
   const csp = offlineHtmlPreviewCsp([]);
   assert.match(csp, /script-src 'none'/);
   assert.doesNotMatch(csp, /https:|allow-scripts|allow-same-origin/);
+});
+
+test("standalone HTML preview mode defaults to offline-static and supports zero-egress local-interactive opt-in", () => {
+  assert.equal(getStandaloneHtmlPreviewMode({}), "offline-static");
+  assert.equal(getStandaloneHtmlPreviewMode({ RAFT_STANDALONE_HTML_PREVIEW: "offline-static" }), "offline-static");
+  assert.equal(getStandaloneHtmlPreviewMode({ RAFT_STANDALONE_HTML_PREVIEW: "local-interactive" }), "local-interactive");
+  assert.throws(() => getStandaloneHtmlPreviewMode({ RAFT_STANDALONE_HTML_PREVIEW: "unsafe" }), /Invalid RAFT_STANDALONE_HTML_PREVIEW/);
+
+  const csp = localInteractiveHtmlPreviewCsp(["http://127.0.0.1:5280"]);
+  assert.match(csp, /sandbox allow-scripts/);
+  assert.match(csp, /script-src 'unsafe-inline'/);
+  assert.match(csp, /connect-src 'none'/);
+  assert.doesNotMatch(csp, /https:|allow-same-origin|allow-popups|allow-top-navigation/);
 });

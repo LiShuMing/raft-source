@@ -3,6 +3,27 @@ import type { Readable } from "node:stream";
 
 export const OFFLINE_HTML_PREVIEW_MAX_BYTES = 2 * 1024 * 1024;
 
+export type StandaloneHtmlPreviewMode = "offline-static" | "local-interactive";
+
+/**
+ * Standalone HTML preview policy:
+ * - `offline-static` (default): strips all scripts and external links (`script-src 'none'`).
+ * - `local-interactive` (explicit opt-in via `RAFT_STANDALONE_HTML_PREVIEW=local-interactive`):
+ *   keeps strict zero-egress CSP (`connect-src 'none'`, no `https:` subresources, opaque
+ *   `sandbox allow-scripts` without `allow-same-origin`) while allowing inline scripts and
+ *   Raft's local measurement bridge for interactive charts, tables, and Mermaid reports.
+ */
+export function getStandaloneHtmlPreviewMode(
+  env: NodeJS.ProcessEnv = process.env,
+): StandaloneHtmlPreviewMode {
+  const raw = env.RAFT_STANDALONE_HTML_PREVIEW?.trim().toLowerCase();
+  if (!raw || raw === "offline-static") return "offline-static";
+  if (raw === "local-interactive") return "local-interactive";
+  throw new Error(
+    `Invalid RAFT_STANDALONE_HTML_PREVIEW=${env.RAFT_STANDALONE_HTML_PREVIEW}; expected "offline-static" or "local-interactive"`,
+  );
+}
+
 // Parse with a browser-compatible HTML parser, never regular expressions over
 // markup. Omit active elements entirely, including templates and SVG animation.
 const ELEMENTS = new Set((
@@ -49,6 +70,16 @@ export function offlineHtmlPreviewCsp(frameAncestors: string[]): string {
   return [
     "default-src 'none'", "sandbox", "script-src 'none'",
     "style-src 'unsafe-inline'", "img-src data:", "font-src data:",
+    "connect-src 'none'", "frame-src 'none'", "object-src 'none'",
+    "base-uri 'none'", "form-action 'none'", "worker-src 'none'",
+    `frame-ancestors 'self' ${frameAncestors.join(" ")}`,
+  ].join("; ");
+}
+
+export function localInteractiveHtmlPreviewCsp(frameAncestors: string[]): string {
+  return [
+    "default-src 'none'", "sandbox allow-scripts", "script-src 'unsafe-inline'",
+    "style-src 'unsafe-inline'", "img-src data: blob:", "font-src data:", "media-src data: blob:",
     "connect-src 'none'", "frame-src 'none'", "object-src 'none'",
     "base-uri 'none'", "form-action 'none'", "worker-src 'none'",
     `frame-ancestors 'self' ${frameAncestors.join(" ")}`,

@@ -18,6 +18,7 @@ export function standalonePaths(env: NodeJS.ProcessEnv = process.env) {
     uploadsDir: path.join(stateDir, "uploads"),
     secretFile: path.join(stateDir, "jwt-secret"),
     providerCredentialKeyFile: path.join(stateDir, "provider-credential-key"),
+    agentApiKeyHmacSecretFile: path.join(stateDir, "agent-api-key-hmac-secret"),
   };
 }
 
@@ -59,6 +60,11 @@ export async function readOrCreateProviderCredentialKey(keyFile: string): Promis
   return key;
 }
 
+/** Persist a dedicated >=32-byte HMAC secret so sk_agent_* verification uses the fast path. */
+export async function readOrCreateAgentApiKeyHmacSecret(secretFile: string): Promise<string> {
+  return readOrCreateSigningKey(secretFile);
+}
+
 export async function configureStandalone(env: NodeJS.ProcessEnv = process.env) {
   const config = standalonePaths(env);
   // An isolated profile must never inherit a cloud database or storage target.
@@ -69,6 +75,7 @@ export async function configureStandalone(env: NodeJS.ProcessEnv = process.env) 
   env.CORS_ORIGIN = config.origin;
   env.JWT_SECRET = await readOrCreateSigningKey(config.secretFile);
   env.SLOCK_PROVIDER_CREDENTIAL_KEY = await readOrCreateProviderCredentialKey(config.providerCredentialKeyFile);
+  env.AGENT_API_KEY_HMAC_SECRET = await readOrCreateAgentApiKeyHmacSecret(config.agentApiKeyHmacSecretFile);
   delete env.SLOCK_PROVIDER_CREDENTIAL_KEY_PREVIOUS;
   env.UPLOADS_LOCAL = "true";
   env.UPLOADS_DIR = config.uploadsDir;

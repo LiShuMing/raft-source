@@ -1,6 +1,7 @@
 import { LocalComputerManager } from "./standalone/localComputer";
 import { createLocalReplicaStateStore } from "./standalone/localReplicaStateStore";
 import { standalonePaths } from "./standalone/config";
+import { removeStandaloneServiceStateIfOwned, startStandalonePgliteMaintenance } from "./standalone/maintenance";
 import { ensureStandaloneServerPlans, STANDALONE_SERVER_PLAN } from "./standalone/plan";
 import { isStandaloneMode } from "./config/deploymentMode";
 import { jointDepartureRegistry, configureJointDepartureEffects } from "./services/jointMembershipDeparture";
@@ -34,7 +35,7 @@ process.on("unhandledRejection", (reason, promise) => {
 });
 
 import { createServer } from "node:http";
-import { initDatabase, prewarmPrimaryPool, setDbTracer, startPoolMetricsReporting } from "./db/index";
+import { checkpointPgliteDatabase, initDatabase, prewarmPrimaryPool, setDbTracer, startPoolMetricsReporting } from "./db/index";
 import { startMachineLivenessMetrics } from "./services/machineLivenessMetrics";
 import { getDbLivenessTracker } from "./dbLiveness";
 import { installAuditedGlobalFetch } from "./db/ambientTransaction";
@@ -394,6 +395,7 @@ async function bootstrap() {
     machineStatus: (machineId) => agentOrchestrator.getMachineStatus(machineId),
   }) : null;
   if (localComputerManager) app.set("localComputerManager", localComputerManager);
+  let standalonePgliteMaintenance: ReturnType<typeof startStandalonePgliteMaintenance> | null = null;
   // Focus: a claim focuses the task for the claimer only when its Computer reads the Focus tag.
   setAgentFocusCapabilityReader((machineId) => agentOrchestrator.machineAdvertisesCapability(machineId, DAEMON_CAPABILITY_AGENT_FOCUS_V1));
   setProductFeedbackTriageNoticeDeliverer(agentOrchestrator);
@@ -908,6 +910,11 @@ async function bootstrap() {
     void localComputerManager?.resume().catch(() => {
       console.warn("[Raft standalone] Could not resume local Computers");
     });
+    if (STANDALONE) {
+      standalonePgliteMaintenance = startStandalonePgliteMaintenance({
+        checkpoint: checkpointPgliteDatabase,
+      });
+    }
     console.log(`[Slock] Server listening on http://localhost:${PORT}`);
     serverTracer.tracer.emitEvent("slock.server.started", { surface: "server" });
     const cpuProfileSampler = cpuProfileSummaryEnabled(process.env, traceDeploymentIdentity.serviceInstanceId)
@@ -1183,7 +1190,14 @@ async function bootstrap() {
           resolve();
         });
       }),
-      settleWorkers: () => Promise.all([provisionWorkerStopped, localComputerManager?.stop()]).then(() => undefined),
+      settleWorkers: () => {
+        standalonePgliteMaintenance?.stop();
+        return Promise.all([
+          provisionWorkerStopped,
+          localComputerManager?.stop(),
+          STANDALONE ? removeStandaloneServiceStateIfOwned(standalonePaths().stateDir, process.pid) : Promise.resolve(),
+        ]).then(() => undefined);
+      },
       releaseMachineOwnership: async () => {
         const [orchestratorResult, slackBridgeResult] = await Promise.allSettled([
           agentOrchestrator.shutdown(),

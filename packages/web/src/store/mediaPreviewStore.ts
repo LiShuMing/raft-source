@@ -9,6 +9,7 @@ import type { Message, MessageAttachment } from "./messageStore";
  * document preview so all four behave identically from any surface.
  */
 export type MediaPreviewKind = "html" | "video" | "audio";
+export type HtmlPreviewMode = "sandboxed-interactive" | "offline-static";
 
 export type MediaPreviewCommentContext = {
   parentMessage: Pick<Message, "id" | "channelId" | "senderId" | "senderType">;
@@ -18,6 +19,8 @@ export type MediaPreviewEntry = {
   kind: MediaPreviewKind;
   attachment: MessageAttachment;
   url: string;
+  /** HTML preview delivery mode reported by `/html-preview-url`. */
+  htmlPreviewMode?: HtmlPreviewMode;
   /** Absent when the opener has no host message (e.g. a forward snapshot). */
   commentContext?: MediaPreviewCommentContext;
 };

@@ -11,6 +11,7 @@ import { servers } from "../db/schema";
 import { actorHasServerCapabilityInServer } from "../lib/actorPermissions";
 import { attachComputer, findComputerByApiKey } from "../services/computerCredentialService";
 import { deleteMachine } from "../services/machineService";
+import { rotateLogFileIfNeeded } from "./maintenance";
 
 const attachmentSchema = z.object({
   version: z.literal(1),
@@ -190,7 +191,9 @@ export class LocalComputerManager {
     try {
       if (this.options.launch) child = this.options.launch(keyFile, home);
       else {
-        const log = openSync(path.join(home, "runner.log"), "a", 0o600);
+        const logPath = path.join(home, "runner.log");
+        rotateLogFileIfNeeded(logPath);
+        const log = openSync(logPath, "a", 0o600);
         try {
           child = fork(this.runnerEntry(), ["--server-url", this.options.origin, "--api-key-file", keyFile], {
             cwd: home,

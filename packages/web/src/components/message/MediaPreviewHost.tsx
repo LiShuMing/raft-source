@@ -38,6 +38,7 @@ export default function MediaPreviewHost() {
       <HtmlAttachmentPreviewModal
         filename={entry.attachment.filename}
         url={entry.url}
+        previewMode={entry.htmlPreviewMode}
         onClose={close}
         onDownload={onDownload}
         comments={comments}

@@ -42,6 +42,7 @@ test("the standalone launcher isolates state from inherited cloud configuration"
       JWT_SECRET: "inherited",
       SLOCK_PROVIDER_CREDENTIAL_KEY: "inherited",
       SLOCK_PROVIDER_CREDENTIAL_KEY_PREVIOUS: "inherited",
+      AGENT_API_KEY_HMAC_SECRET: "inherited",
       RESEND_API_KEY: "inherited",
       HANDS_FEEDBACK_APP_TOKEN: "inherited",
       TRANSLATION_PROVIDER: "fake",
@@ -51,6 +52,7 @@ test("the standalone launcher isolates state from inherited cloud configuration"
     const first = await configureStandalone(env);
     const key = env.JWT_SECRET;
     const providerKey = env.SLOCK_PROVIDER_CREDENTIAL_KEY;
+    const hmacSecret = env.AGENT_API_KEY_HMAC_SECRET;
     await configureStandalone(env);
     assert.equal(env.JWT_SECRET, key);
     assert.notEqual(key, "inherited");
@@ -58,6 +60,10 @@ test("the standalone launcher isolates state from inherited cloud configuration"
     assert.notEqual(providerKey, "inherited");
     assert.equal(Buffer.from(providerKey!, "base64").byteLength, 32);
     assert.equal((await stat(first.providerCredentialKeyFile)).mode & 0o777, 0o600);
+    assert.equal(env.AGENT_API_KEY_HMAC_SECRET, hmacSecret);
+    assert.notEqual(hmacSecret, "inherited");
+    assert.ok(hmacSecret && hmacSecret.length >= 32);
+    assert.equal((await stat(first.agentApiKeyHmacSecretFile)).mode & 0o777, 0o600);
     assert.equal(env.SLOCK_PROVIDER_CREDENTIAL_KEY_PREVIOUS, undefined);
     assert.equal(env.DATABASE_URL, `pglite://${path.join(dir, "postgres")}`);
     assert.equal(env.APP_URL, first.origin);
